@@ -2,6 +2,7 @@ package com.example.minidbms.controllersGUI;
 
 import com.example.minidbms.domain.DBMS;
 import com.example.minidbms.domain.Database;
+import com.example.minidbms.domain.Table;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -43,6 +44,9 @@ public class MainWindow {
             return;
         }
         if (ProcessDropDatabase()) {
+            return;
+        }
+        if (ProcessDropTable()) {
             return;
         }
         else {
@@ -138,6 +142,40 @@ public class MainWindow {
 
     public void DropDatabase(String databaseName) {
         myDBMS.dropDatabase(databaseName);
+        saveDBMSToXML(myDBMS);
+    }
+
+    public boolean ProcessDropTable() {
+        String dropTablePatter = "(drop table) [a-zA-Z_$][a-zA-Z_$0-9]*;";
+        String tableName = "";
+
+        Pattern pattern = Pattern.compile(dropTablePatter);
+        Matcher matcher = pattern.matcher(sqlStatementTextArea.getText().toLowerCase());
+
+        if (!matcher.matches()) {
+            return false;
+        }
+
+        if (crtDatabase == null) {
+            resultTextArea.setText("Please select a database to use first!");
+            return true;
+        }
+
+        tableName = sqlStatementTextArea.getText().substring(11, sqlStatementTextArea.getText().length() -1);
+
+        List<Table> tableList =  crtDatabase.getTables();
+        if (!tableList.stream().map(table -> table.getTableName().toLowerCase()).toList().contains(tableName.toLowerCase())) {
+            resultTextArea.setText("Table name " + tableName +" do not exist in " + crtDatabase.getDatabaseName() +" database. Try again!");
+            return true;
+        }
+
+        DropTable(tableName);
+        resultTextArea.setText("Table " + tableName + " was dropped!");
+        return true;
+    }
+
+    public void DropTable(String tableName) {
+        crtDatabase.dropTable(tableName);
         saveDBMSToXML(myDBMS);
     }
 }

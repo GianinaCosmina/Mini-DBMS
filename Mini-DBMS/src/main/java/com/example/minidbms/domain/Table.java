@@ -7,6 +7,7 @@ import java.util.List;
 @XmlAccessorType(XmlAccessType.FIELD )
 @XmlRootElement(name = "tables")
 @XmlType(name = "tables", propOrder = { "tableName", "fileName", "columns", "primaryKeys", "foreignKeys", "indexes" })
+public
 class Table {
     @XmlAttribute
     private String tableName;

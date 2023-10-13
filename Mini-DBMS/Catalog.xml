@@ -23,10 +23,4 @@
             </table>
         </tables>
     </database>
-    <database databaseName="Database1">
-        <tables/>
-    </database>
-    <database databaseName="ana">
-        <tables/>
-    </database>
 </databases>

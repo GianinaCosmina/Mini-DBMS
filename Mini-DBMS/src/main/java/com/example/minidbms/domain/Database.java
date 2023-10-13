@@ -30,7 +30,7 @@ class Database {
     public void dropTable(String tableName) {
         Table tableToRemove = null;
         for (Table table : tables) {
-            if (table.getTableName().equals(tableName)) {
+            if (table.getTableName().equalsIgnoreCase(tableName)) {
                 tableToRemove = table;
                 break;
             }

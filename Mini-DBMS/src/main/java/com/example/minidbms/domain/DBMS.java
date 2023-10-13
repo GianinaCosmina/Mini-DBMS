@@ -36,7 +36,7 @@ class DBMS {
     public void dropDatabase(String name) {
         Database databaseToRemove = null;
         for (Database database : databases) {
-            if (database.getDatabaseName().equals(name)) {
+            if (database.getDatabaseName().equalsIgnoreCase(name)) {
                 databaseToRemove = database;
                 break;
             }
