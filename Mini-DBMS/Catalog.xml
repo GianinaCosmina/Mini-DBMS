@@ -1,4 +1,26 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<Databases>
-    <Database dataBaseName="test"/>
-</Databases>
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<databases>
+    <database databaseName="Database1">
+        <tables/>
+    </database>
+    <database databaseName="Database2">
+        <tables>
+            <table tableName="Users">
+                <structure>
+                    <attribute columnName="ID" type="int">
+                        <isPrimaryKey>true</isPrimaryKey>
+                    </attribute>
+                    <attribute columnName="Username" type="varchar">
+                        <isPrimaryKey>false</isPrimaryKey>
+                    </attribute>
+                    <attribute columnName="Email" type="varchar">
+                        <isPrimaryKey>false</isPrimaryKey>
+                    </attribute>
+                </structure>
+                <primaryKey/>
+                <foreignKeys/>
+                <IndexFiles/>
+            </table>
+        </tables>
+    </database>
+</databases>
