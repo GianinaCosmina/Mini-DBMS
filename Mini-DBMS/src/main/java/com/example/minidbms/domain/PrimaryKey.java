@@ -1,2 +1,4 @@
-package com.example.minidbms.domain;public class PrimaryKey {
+package com.example.minidbms.domain;
+
+public class PrimaryKey {
 }

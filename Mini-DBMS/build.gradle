@@ -1,9 +1,7 @@
 plugins {
   id 'java'
   id 'application'
-  id 'org.javamodularity.moduleplugin' version '1.8.12'
-  id 'org.openjfx.javafxplugin' version '0.0.13'
-  id 'org.beryx.jlink' version '2.25.0'
+  id 'org.openjfx.javafxplugin' version '0.0.10'
 }
 
 group 'com.example'
@@ -14,7 +12,7 @@ repositories {
 }
 
 ext {
-  junitVersion = '5.9.2'
+  junitVersion = '5.7.1'
 }
 
 sourceCompatibility = '17'
@@ -30,39 +28,62 @@ application {
 }
 
 javafx {
-  version = '17.0.6'
-  modules = ['javafx.controls', 'javafx.fxml', 'javafx.media']
+  version = '17.0.0.1'
+  modules = ['javafx.controls', 'javafx.fxml']
 }
 
 dependencies {
-  implementation('org.controlsfx:controlsfx:11.1.2')
-  implementation('com.dlsc.formsfx:formsfx-core:11.6.0') {
-    exclude(group: 'org.openjfx')
-  }
-  implementation('net.synedra:validatorfx:0.4.0') {
+  implementation('org.controlsfx:controlsfx:11.1.0')
+  implementation('com.dlsc.formsfx:formsfx-core:11.3.2') {
     exclude(group: 'org.openjfx')
   }
   implementation('org.kordamp.bootstrapfx:bootstrapfx-core:0.4.0')
-  implementation('com.github.almasb:fxgl:17.2') {
-    exclude(group: 'org.openjfx')
-    exclude(group: 'org.jetbrains.kotlin')
-  }
+  implementation 'com.itextpdf:itextg:5.5.10'
 
   testImplementation("org.junit.jupiter:junit-jupiter-api:${junitVersion}")
   testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:${junitVersion}")
+
+  // ADD THIS ONE FOR JDBC TO WORK!
+  implementation 'org.postgresql:postgresql:42.3.1'
+
+  // for Apache PDF
+  implementation 'org.apache.pdfbox:pdfbox:2.0.25'
+
+  // for WordUtils
+  implementation group: 'org.apache.commons', name: 'commons-text', version: '1.9'
+
+//  implementation 'jakarta.xml.bind:jakarta.xml.bind-api:3.0.1'
+//  implementation 'com.sun.xml.bind:jaxb-xjc:3.0.1'
+//  runtimeOnly 'com.sun.xml.bind:jaxb-impl:3.0.1'
+//  runtimeOnly 'org.glassfish.jaxb:jaxb-runtime:3.0.1'
+
+//  annotationProcessor 'jakarta.xml.bind:jakarta.xml.bind-api:2.3.2'
+//  testAnnotationProcessor 'jakarta.xml.bind:jakarta.xml.bind-api:2.3.2'
+//  // https://mvnrepository.com/artifact/javax.xml.bind/jaxb-api
+////   implementation group: 'javax.xml.bind', name: 'jaxb-api', version: '2.1'
+//
+//  // https://mvnrepository.com/artifact/javax.activation/activation
+//  implementation group: 'javax.activation', name: 'activation', version: '1.1.1'
+//  // https://mvnrepository.com/artifact/javax.xml.stream/stax-api
+//  implementation group: 'javax.xml.stream', name: 'stax-api', version: '1.0-2'
+
+  // https://mvnrepository.com/artifact/javax.xml.bind/jaxb-api
+//  implementation group: 'javax.xml.bind', name: 'jaxb-api', version: '2.2.4'
+  // https://mvnrepository.com/artifact/javax.activation/activation
+//  implementation group: 'javax.activation', name: 'activation', version: '1.1.1'
+
+//  implementation "javax.xml.bind:jaxb-api:2.3.0"
+//  implementation 'com.sun.activation:javax.activation:1.2.0'
+
+//  implementation "com.sun.xml.bind:jaxb-core:2.3.0.1"
+//  implementation "javax.xml.bind:jaxb-api:2.3.1"
+//  implementation "com.sun.xml.bind:jaxb-impl:2.3.1"
+//  implementation "org.javassist:javassist:3.25.0-GA"
+
+  implementation "jakarta.xml.bind:jakarta.xml.bind-api:2.3.2"
+  implementation "org.glassfish.jaxb:jaxb-runtime:2.3.2"
 }
 
 test {
-  useJUnitPlatform()  }
-
-jlink {
-  imageZip = project.file("${buildDir}/distributions/app-${javafx.platform.classifier}.zip")
-  options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages']
-  launcher {
-    name = 'app'
-  }
-}
-
-jlinkZip {
-  group = 'distribution'
+  useJUnitPlatform()
 }

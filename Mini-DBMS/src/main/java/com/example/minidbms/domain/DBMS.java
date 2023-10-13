@@ -8,11 +8,11 @@ import java.util.List;
 @XmlRootElement(name = "databases")
 @XmlType(propOrder = { "databases" })
 public
-class Databases {
+class DBMS {
     @XmlElement(name = "database")
     private List<Database> databases;
 
-    public Databases() {
+    public DBMS() {
         this.databases = new ArrayList<>();
     }
 
@@ -48,5 +48,14 @@ class Databases {
 
     public List<Database> listDatabases() {
         return databases;
+    }
+
+    public Database getDatabaseByName(String name){
+        for (Database database: this.databases) {
+            if (database.getDatabaseName().equalsIgnoreCase(name)) {
+                return database;
+            }
+        }
+        return null;
     }
 }

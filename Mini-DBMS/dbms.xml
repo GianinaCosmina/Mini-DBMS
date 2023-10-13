@@ -1,21 +1,44 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <databases>
     <database databaseName="Database1"/>
+    <database databaseName="Database2"/>
+    <database databaseName="Database1"/>
+    <database databaseName="Database2"/>
+    <database databaseName="Database1"/>
+    <database databaseName="Database2"/>
+    <database databaseName="Database1"/>
+    <database databaseName="Database2"/>
+    <database databaseName="Database1">
+        <tables/>
+    </database>
     <database databaseName="Database2">
-        <tables tableName="Users">
-            <columns columnName="ID" type="int">
-                <isPrimaryKey>true</isPrimaryKey>
-            </columns>
-            <columns columnName="Username" type="varchar">
-                <isPrimaryKey>false</isPrimaryKey>
-            </columns>
-            <columns columnName="Email" type="varchar">
-                <isPrimaryKey>false</isPrimaryKey>
-            </columns>
-            <primaryKeys>ID</primaryKeys>
-            <foreignKeys/>
-            <indexes>Username</indexes>
-            <indexes>Email</indexes>
+        <tables>
+            <table tableName="Users">
+                <foreignKeys/>
+            </table>
+        </tables>
+    </database>
+    <database databaseName="Database1">
+        <tables/>
+    </database>
+    <database databaseName="Database2">
+        <tables>
+            <table tableName="Users">
+                <structure>
+                    <attribute columnName="ID" type="int">
+                        <isPrimaryKey>true</isPrimaryKey>
+                    </attribute>
+                    <attribute columnName="Username" type="varchar">
+                        <isPrimaryKey>false</isPrimaryKey>
+                    </attribute>
+                    <attribute columnName="Email" type="varchar">
+                        <isPrimaryKey>false</isPrimaryKey>
+                    </attribute>
+                </structure>
+                <primaryKey/>
+                <foreignKeys/>
+                <IndexFiles/>
+            </table>
         </tables>
     </database>
 </databases>
