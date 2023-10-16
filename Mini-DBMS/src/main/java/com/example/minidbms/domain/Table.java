@@ -37,10 +37,17 @@ class Table {
         this.indexes = new ArrayList<>();
     }
 
-//    public void createIndex(String columnName) {
-//        indexes.add(columnName);
-//    }
+    public Table(String tableName, List<Column> columns, List<PrimaryKey> primaryKeys, List<ForeignKey> foreignKeys) {
+        this.tableName = tableName;
+        this.fileName = fileName;
+        this.columns = columns;
+        this.primaryKeys = primaryKeys;
+        this.foreignKeys = foreignKeys;
+    }
 
+        public void createIndex(Index newIndex) {
+        indexes.add(newIndex);
+    }
 
     public String getTableName() {
         return tableName;

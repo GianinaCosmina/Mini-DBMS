@@ -59,4 +59,13 @@ class Database {
     public void setTables(List<Table> tables) {
         this.tables = tables;
     }
+
+    public Table getTableByName(String name) {
+        for (Table table: this.tables) {
+            if (table.getTableName().equalsIgnoreCase(name)) {
+                return table;
+            }
+        }
+        return null;
+    }
 }
