@@ -22,8 +22,8 @@ class Table {
     @XmlElement(name = "foreignKey")
     @XmlElementWrapper(name = "foreignKeys")
     private List<ForeignKey> foreignKeys;
-    @XmlElement(name = "IndexFile")
-    @XmlElementWrapper(name = "IndexFiles")
+    @XmlElement(name = "IndexAttribute")
+    @XmlElementWrapper(name = "IndexAttributes")
     private List<Index> indexes;
 
     public Table() {
@@ -39,10 +39,11 @@ class Table {
 
     public Table(String tableName, List<Column> columns, List<PrimaryKey> primaryKeys, List<ForeignKey> foreignKeys) {
         this.tableName = tableName;
-        this.fileName = fileName;
+        this.fileName =  tableName + ".bin" ;
         this.columns = columns;
         this.primaryKeys = primaryKeys;
         this.foreignKeys = foreignKeys;
+        this.indexes = new ArrayList<>();
     }
 
         public void createIndex(Index newIndex) {

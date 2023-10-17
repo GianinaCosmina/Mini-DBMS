@@ -1,23 +1,23 @@
 package com.example.minidbms.domain;
 
 public class PrimaryKey {
-    private String columnName;
+    private String pkAttribute;
 
     public PrimaryKey() {
     }
 
-    public PrimaryKey(String columnName) {
-        this.columnName = columnName;
+    public PrimaryKey(String pkAttribute) {
+        this.pkAttribute = pkAttribute;
     }
 
     // Getter and Setter methods for the field
 
-    public String getColumnName() {
-        return columnName;
+    public String getPkAttribute() {
+        return pkAttribute;
     }
 
-    public void setColumnName(String columnName) {
-        this.columnName = columnName;
+    public void setPkAttribute(String pkAttribute) {
+        this.pkAttribute = pkAttribute;
     }
 }
 

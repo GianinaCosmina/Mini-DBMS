@@ -6,11 +6,15 @@ public class Index {
     private String indexName;
     private String tableName;
     private List<String> columns;
+    private String fileName;
+
+    public Index() {}
 
     public Index(String indexName, String tableName, List<String> columns) {
         this.indexName = indexName;
         this.tableName = tableName;
         this.columns = columns;
+        this.fileName = indexName + ".ind";
     }
 
     // Getter and Setter methods for the fields

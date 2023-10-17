@@ -203,11 +203,22 @@ public class MainWindow {
             Pattern tableNamePattern = Pattern.compile("create table ([a-zA-Z_$][a-zA-Z_$0-9]*)", Pattern.CASE_INSENSITIVE);
             Matcher tableNameMatcher = tableNamePattern.matcher(tableDefinition);
 
+            if (crtDatabase == null) {
+                resultTextArea.setText("Please select a database to use first!");
+                return true;
+            }
+
             if (tableNameMatcher.find()) {
                 tableName = tableNameMatcher.group(1);
             }
 
-            Pattern columnPattern = Pattern.compile("\\(([^)]+)\\)", Pattern.DOTALL);
+            List<Table> tableList =  crtDatabase.getTables();
+            if (tableList.stream().map(table -> table.getTableName().toLowerCase()).toList().contains(tableName.toLowerCase())) {
+                resultTextArea.setText("Table name " + tableName +" already exist in " + crtDatabase.getDatabaseName() +" database. Try again!");
+                return true;
+            }
+
+            Pattern columnPattern = Pattern.compile("\\(((.|\\n)*)(\\);)", Pattern.DOTALL);
             Matcher columnMatcher = columnPattern.matcher(tableDefinition);
 
             if (columnMatcher.find()) {
@@ -225,28 +236,27 @@ public class MainWindow {
                     String attributeName = parts[0];
                     String attributeType = parts[1];
 
-                    if (attributeDefinition.contains("primary key")) {
+                    if (attributeDefinition.toLowerCase().contains("primary key")) {
                         primaryKeys.add(new PrimaryKey(attributeName));
                     }
 
-                    if (attributeDefinition.contains("foreign key")) {
-                        String[] fkParts = attributeDefinition.split("\\s+");
+                    if (attributeDefinition.toLowerCase().contains("references")) {
+                        attributeDefinition = attributeDefinition.replace("\n", "");
+                        String[] fkParts = attributeDefinition.trim().split("\\s+");
 
                         if (fkParts.length >= 5) {
-                            String foreignAttribute = fkParts[3];
-                            String[] referencesParts = fkParts[5].split("references");
-                            String[] referencedParts = referencesParts[1].trim().split("\\(");
-                            String referencedTable = referencedParts[0];
-                            String referencedAttribute = referencedParts[1].replaceAll("\\)", "");
+                            String referencedTable = fkParts[3];
+                            String referencedAttribute = fkParts[4].replaceAll("\\)", "");
+                            referencedAttribute = fkParts[4].replaceAll("\\(", "");
 
-                            foreignKeys.add(new ForeignKey(attributeName, foreignAttribute, referencedTable, referencedAttribute));
+                            foreignKeys.add(new ForeignKey(attributeName, referencedTable, referencedAttribute));
                         } else {
                             resultTextArea.setText("Invalid foreign key definition: " + attributeDefinition);
                             return true;
                         }
                     }
 
-                    if (attributeDefinition.contains("create index")) {
+                    if (attributeDefinition.toLowerCase().contains("create index")) {
                         String[] indexParts = attributeDefinition.split(" ");
                         if (indexParts.length >= 7) {
                             String indexName = indexParts[3];
@@ -299,6 +309,12 @@ public class MainWindow {
         String[] columnNames = columnListStr.split(",\\s*");
         for (String columnName : columnNames) {
             columnList.add(columnName.trim());
+        }
+
+        List<Table> tableList =  crtDatabase.getTables();
+        if (!tableList.stream().map(table -> table.getTableName().toLowerCase()).toList().contains(tableName.toLowerCase())) {
+            resultTextArea.setText("Table name " + tableName +" do not exist in " + crtDatabase.getDatabaseName() +" database. Try again!");
+            return true;
         }
 
         Index index = new Index(indexName, tableName, columnList);

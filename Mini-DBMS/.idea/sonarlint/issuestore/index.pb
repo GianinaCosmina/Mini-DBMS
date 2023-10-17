@@ -10,5 +10,3 @@
 build.gradle,f\0\f07866736216be0ee2aba49e392191aeae700a35
 N
 src/main/java/module-info.java,1\c\1c89a5491fbfda3fb050196d6a239f20200296e7
-_
-/src/main/java/com/example/minidbms/MainGUI.java,9\9\9977a655017fc4c7e8bb60664e63b7492c49d7ed
