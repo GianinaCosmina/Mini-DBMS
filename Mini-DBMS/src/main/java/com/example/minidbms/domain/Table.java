@@ -48,6 +48,20 @@ class Table {
 
         public void createIndex(Index newIndex) {
         indexes.add(newIndex);
+
+    }
+
+    public void dropIndex(String indexName) {
+        Index indexToRemove = null;
+        for (Index index : indexes) {
+            if (index.getIndexName().equalsIgnoreCase(indexName)) {
+                indexToRemove = index;
+                break;
+            }
+        }
+        if (indexToRemove != null) {
+            indexes.remove(indexToRemove);
+        }
     }
 
     public String getTableName() {

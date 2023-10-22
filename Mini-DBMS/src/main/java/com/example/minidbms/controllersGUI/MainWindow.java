@@ -1,6 +1,7 @@
 package com.example.minidbms.controllersGUI;
 
 import com.example.minidbms.domain.*;
+import com.example.minidbms.enums.DataTypes;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -10,6 +11,7 @@ import javafx.stage.Stage;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -53,6 +55,9 @@ public class MainWindow {
             return;
         }
         if (ProcessCreateIndex()) {
+            return;
+        }
+        if (ProcessDropIndex()) {
             return;
         }
         else {
@@ -235,6 +240,18 @@ public class MainWindow {
 
                     String attributeName = parts[0];
                     String attributeType = parts[1];
+                    List<String> attributeTypeElems = new ArrayList<>();
+                    Integer length = null;
+                    boolean hasLength;
+                    if ( attributeType.contains("(")){
+                        length = Integer.parseInt(attributeType.split("\\(")[1].replaceAll("\\)",""));
+                        attributeType = attributeType.split("\\(")[0];
+                    }
+
+                    if (!ValidateDataType(attributeType)) {
+                        resultTextArea.setText("Invalid dataType: " + attributeType);
+                        return true;
+                    }
 
                     if (attributeDefinition.toLowerCase().contains("primary key")) {
                         primaryKeys.add(new PrimaryKey(attributeName));
@@ -247,9 +264,20 @@ public class MainWindow {
                         if (fkParts.length >= 5) {
                             String referencedTable = fkParts[3];
                             String referencedAttribute = fkParts[4].replaceAll("\\)", "");
-                            referencedAttribute = fkParts[4].replaceAll("\\(", "");
 
-                            foreignKeys.add(new ForeignKey(attributeName, referencedTable, referencedAttribute));
+
+                            if (!crtDatabase.getTables().stream().map(table -> table.getTableName().toLowerCase()).toList().contains(referencedTable.toLowerCase())) {
+                                resultTextArea.setText("Table name " + referencedTable +" do not exist in " + crtDatabase.getDatabaseName() +" database. Try again!");
+                                return true;
+                            }
+
+                            Table crtTable = crtDatabase.getTableByName(referencedTable);
+                            List<Column> tableColumns = crtTable.getColumns();
+                            if (!tableColumns.stream().map(column -> column.getColumnName().toLowerCase()).toList().contains(referencedAttribute.replaceAll("\\(", "").toLowerCase(Locale.ROOT))){
+                                resultTextArea.setText("Index name " + referencedAttribute.replaceAll("\\(", "") + " do not exist in " + referencedTable + " table.Try again!");
+                                return true;
+                            }
+                            foreignKeys.add(new ForeignKey(attributeName, referencedTable, referencedAttribute.replaceAll("\\(", "")));
                         } else {
                             resultTextArea.setText("Invalid foreign key definition: " + attributeDefinition);
                             return true;
@@ -274,6 +302,9 @@ public class MainWindow {
                     Column column = new Column();
                     column.setColumnName(attributeName);
                     column.setType(attributeType);
+                    if (length != null){
+                        column.setLength(length);
+                    }
                     columns.add(column);
                 }
             }
@@ -289,6 +320,8 @@ public class MainWindow {
         }
     }
 
+
+
     public boolean ProcessCreateIndex() {
         String createIndexPattern = "create index [a-zA-Z_$][a-zA-Z_$0-9]* on [a-zA-Z_$][a-zA-Z_$0-9]* \\([^)]+\\);";
         String indexName = "";
@@ -298,8 +331,14 @@ public class MainWindow {
         Pattern pattern = Pattern.compile(createIndexPattern, Pattern.CASE_INSENSITIVE);
         Matcher matcher = pattern.matcher(sqlStatementTextArea.getText());
 
+
         if (!matcher.matches()) {
             return false;
+        }
+
+        if (crtDatabase == null) {
+            resultTextArea.setText("Please select a database to use first!");
+            return true;
         }
 
         String[] parts = sqlStatementTextArea.getText().split(" ");
@@ -325,4 +364,64 @@ public class MainWindow {
         resultTextArea.setText("Index " + indexName + " created on table " + tableName + " with columns: " + columnList);
         return true;
     }
+
+    public boolean ProcessDropIndex() {
+        String dropIndexPatter = "drop index [a-zA-Z_$][a-zA-Z_$0-9]* on [a-zA-Z_$][a-zA-Z_$0-9]*;";
+        String indexName = "";
+        String tableName= "";
+
+        Pattern pattern = Pattern.compile(dropIndexPatter);
+        Matcher matcher = pattern.matcher(sqlStatementTextArea.getText().toLowerCase());
+
+        if (!matcher.matches()) {
+            return false;
+        }
+
+        if (crtDatabase == null) {
+            resultTextArea.setText("Please select a database to use first!");
+            return true;
+        }
+
+        String[] parts = sqlStatementTextArea.getText().split(" ");
+        indexName = parts[2];
+        tableName = parts[4].replace(";","");
+
+
+
+        List<Table> tableList =  crtDatabase.getTables();
+        if (!tableList.stream().map(table -> table.getTableName().toLowerCase()).toList().contains(tableName.toLowerCase())) {
+            resultTextArea.setText("Table name " + tableName +" do not exist in " + crtDatabase.getDatabaseName() +" database. Try again!");
+            return true;
+        }
+
+
+
+        Table crtTable = crtDatabase.getTableByName(tableName);
+        List<Index> indexList = crtTable.getIndexes();
+        if (!indexList.stream().map(index -> index.getIndexName().toLowerCase()).toList().contains(indexName.toLowerCase(Locale.ROOT))){
+            resultTextArea.setText("Index name " + indexName + " do not exist in " + tableName + " table.Try again!");
+            return true;
+        }
+
+
+
+        DropIndex(crtTable,indexName);
+        resultTextArea.setText("Index " + indexName + " was dropped!");
+        return true;
+    }
+
+    public void DropIndex(Table table, String indexName) {
+        table.dropIndex(indexName);
+        saveDBMSToXML(myDBMS);
+    }
+
+    public boolean ValidateDataType(String attributeType){
+        List<String> dataTypes = Arrays.asList("int", "varchar","char");
+        if (dataTypes.contains(attributeType.toLowerCase(Locale.ROOT))){
+            return true;
+        }
+        return false;
+        //if (dataTypes.stream().map(dataType -> {dataType.contains() }))
+    }
+
 }

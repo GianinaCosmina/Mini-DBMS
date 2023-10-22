@@ -1,2 +1,111 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<databases/>
+<databases>
+    <database databaseName="test">
+        <tables>
+            <table tableName="specialization" fileName="specialization.bin">
+                <structure>
+                    <attribute columnName="specid" type="varchar(5)" length="0"/>
+                    <attribute columnName="specname" type="varchar(40)" length="0"/>
+                    <attribute columnName="language" type="varchar(20)" length="0"/>
+                </structure>
+                <primaryKey>
+                    <pkAttribute>
+                        <pkAttribute>specid</pkAttribute>
+                    </pkAttribute>
+                </primaryKey>
+                <foreignKeys/>
+                <IndexAttributes/>
+            </table>
+            <table tableName="groups" fileName="groups.bin">
+                <structure>
+                    <attribute columnName="groupid" type="int" length="0"/>
+                    <attribute columnName="specid" type="varchar(20)" length="0"/>
+                </structure>
+                <primaryKey>
+                    <pkAttribute>
+                        <pkAttribute>groupid</pkAttribute>
+                    </pkAttribute>
+                </primaryKey>
+                <foreignKeys>
+                    <foreignKey>
+                        <fkAttribute>specid</fkAttribute>
+                        <refAttribute>specid</refAttribute>
+                        <refTable>specialization</refTable>
+                    </foreignKey>
+                </foreignKeys>
+                <IndexAttributes/>
+            </table>
+            <table tableName="disciplines" fileName="disciplines.bin">
+                <structure>
+                    <attribute columnName="discid" type="varchar(5)" length="0"/>
+                    <attribute columnName="dname" type="varchar(20)" length="0"/>
+                    <attribute columnName="creditnr" type="int" length="0"/>
+                </structure>
+                <primaryKey>
+                    <pkAttribute>
+                        <pkAttribute>discid</pkAttribute>
+                    </pkAttribute>
+                </primaryKey>
+                <foreignKeys/>
+                <IndexAttributes/>
+            </table>
+            <table tableName="groups2" fileName="groups2.bin">
+                <structure>
+                    <attribute columnName="groupid" type="int" length="0"/>
+                    <attribute columnName="specid" type="varchar" length="20"/>
+                </structure>
+                <primaryKey>
+                    <pkAttribute>
+                        <pkAttribute>groupid</pkAttribute>
+                    </pkAttribute>
+                </primaryKey>
+                <foreignKeys>
+                    <foreignKey>
+                        <fkAttribute>specid</fkAttribute>
+                        <refAttribute>specid</refAttribute>
+                        <refTable>specialization</refTable>
+                    </foreignKey>
+                </foreignKeys>
+                <IndexAttributes/>
+            </table>
+            <table tableName="groups3" fileName="groups3.bin">
+                <structure>
+                    <attribute columnName="groupid" type="int"/>
+                    <attribute columnName="specid" type="varchar" length="20"/>
+                </structure>
+                <primaryKey>
+                    <pkAttribute>
+                        <pkAttribute>groupid</pkAttribute>
+                    </pkAttribute>
+                </primaryKey>
+                <foreignKeys>
+                    <foreignKey>
+                        <fkAttribute>specid</fkAttribute>
+                        <refAttribute>specid</refAttribute>
+                        <refTable>specialization</refTable>
+                    </foreignKey>
+                </foreignKeys>
+                <IndexAttributes/>
+            </table>
+            <table tableName="groups4" fileName="groups4.bin">
+                <structure>
+                    <attribute columnName="groupid" type="int"/>
+                    <attribute columnName="specid" type="varchar" length="20"/>
+                </structure>
+                <primaryKey>
+                    <pkAttribute>
+                        <pkAttribute>groupid</pkAttribute>
+                    </pkAttribute>
+                </primaryKey>
+                <foreignKeys>
+                    <foreignKey>
+                        <fkAttribute>specid</fkAttribute>
+                        <refAttribute>specid</refAttribute>
+                        <refTable>specialization</refTable>
+                    </foreignKey>
+                </foreignKeys>
+                <IndexAttributes/>
+            </table>
+        </tables>
+    </database>
+</databases>

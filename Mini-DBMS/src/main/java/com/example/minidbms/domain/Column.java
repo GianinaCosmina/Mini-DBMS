@@ -5,13 +5,15 @@ import javax.xml.bind.annotation.*;
 
 @XmlAccessorType(XmlAccessType.FIELD )
 @XmlRootElement(name = "column")
-@XmlType(propOrder = { "columnName", "type" })
+@XmlType(propOrder = { "columnName", "type" ,"length"})
 public
 class Column {
     @XmlAttribute
     private String columnName;
     @XmlAttribute
     private String type;
+    @XmlAttribute
+    private Integer length;
 
     public Column() {
     }
@@ -35,5 +37,13 @@ class Column {
 
     public void setType(String type) {
         this.type = type;
+    }
+
+    public Integer getLength() {
+        return length;
+    }
+
+    public void setLength(Integer length) {
+        this.length = length;
     }
 }
