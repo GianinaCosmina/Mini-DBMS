@@ -108,4 +108,10 @@
             </table>
         </tables>
     </database>
+    <database databaseName="test_GIF">
+        <tables/>
+    </database>
+    <database databaseName="test_gif2">
+        <tables/>
+    </database>
 </databases>

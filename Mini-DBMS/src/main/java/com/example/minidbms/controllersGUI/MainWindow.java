@@ -1,17 +1,15 @@
 package com.example.minidbms.controllersGUI;
 
 import com.example.minidbms.domain.*;
-import com.example.minidbms.enums.DataTypes;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoDatabase;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.stage.Stage;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,6 +24,7 @@ public class MainWindow {
     private TextArea sqlStatementTextArea, resultTextArea;
     private DBMS myDBMS;
     private Database crtDatabase;
+    private MongoClient mongoClient;
 
     @FXML
     public void closeWindow() {
@@ -67,6 +66,10 @@ public class MainWindow {
 
     public void SetDatabases(DBMS myDBMS) {
         this.myDBMS = myDBMS;
+    }
+
+    public  void SetMongoClient(MongoClient mongoClient){
+        this.mongoClient = mongoClient;
     }
 
     public boolean ProcessUseDatabase() {
@@ -149,16 +152,19 @@ public class MainWindow {
     public void CreateDatabase(String databaseName) {
         myDBMS.createDatabase(databaseName);
         saveDBMSToXML(myDBMS);
+        mongoClient.getDatabase(databaseName);
     }
 
     public void DropDatabase(String databaseName) {
         myDBMS.dropDatabase(databaseName);
         saveDBMSToXML(myDBMS);
+        MongoDatabase database = mongoClient.getDatabase(databaseName);
+        database.drop();
     }
 
     public boolean ProcessDropTable() {
         String dropTablePatter = "(drop table) [a-zA-Z_$][a-zA-Z_$0-9]*;";
-        String tableName = "";
+        String tableName;
 
         Pattern pattern = Pattern.compile(dropTablePatter);
         Matcher matcher = pattern.matcher(sqlStatementTextArea.getText().toLowerCase());
@@ -181,6 +187,10 @@ public class MainWindow {
         }
 
         DropTable(tableName);
+        //Connecting to the database
+        MongoDatabase database = mongoClient.getDatabase(crtDatabase.getDatabaseName());
+        // drop table
+        database.getCollection(tableName).drop();
         resultTextArea.setText("Table " + tableName + " was dropped!");
         return true;
     }
@@ -313,6 +323,10 @@ public class MainWindow {
             newTable.setIndexes(indexes);
             crtDatabase.createTable(newTable);
             saveDBMSToXML(myDBMS);
+            //Connecting to the database
+            MongoDatabase database = mongoClient.getDatabase(crtDatabase.getDatabaseName());
+            //Creating a collection
+            database.createCollection(tableName);
             resultTextArea.setText("Table " + tableName + " created successfully!");
             return true;
         } else {

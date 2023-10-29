@@ -13,6 +13,9 @@ module com.example.minidbms {
     // for WordUtils
     requires org.apache.commons.text;
     requires java.xml.bind;
+    requires org.mongodb.driver.core;
+    requires org.mongodb.driver.sync.client;
+    requires org.mongodb.bson;
 
     opens com.example.minidbms.domain to java.xml.bind;
 

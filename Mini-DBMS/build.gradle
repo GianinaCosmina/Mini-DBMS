@@ -52,36 +52,10 @@ dependencies {
   // for WordUtils
   implementation group: 'org.apache.commons', name: 'commons-text', version: '1.9'
 
-//  implementation 'jakarta.xml.bind:jakarta.xml.bind-api:3.0.1'
-//  implementation 'com.sun.xml.bind:jaxb-xjc:3.0.1'
-//  runtimeOnly 'com.sun.xml.bind:jaxb-impl:3.0.1'
-//  runtimeOnly 'org.glassfish.jaxb:jaxb-runtime:3.0.1'
-
-//  annotationProcessor 'jakarta.xml.bind:jakarta.xml.bind-api:2.3.2'
-//  testAnnotationProcessor 'jakarta.xml.bind:jakarta.xml.bind-api:2.3.2'
-//  // https://mvnrepository.com/artifact/javax.xml.bind/jaxb-api
-////   implementation group: 'javax.xml.bind', name: 'jaxb-api', version: '2.1'
-//
-//  // https://mvnrepository.com/artifact/javax.activation/activation
-//  implementation group: 'javax.activation', name: 'activation', version: '1.1.1'
-//  // https://mvnrepository.com/artifact/javax.xml.stream/stax-api
-//  implementation group: 'javax.xml.stream', name: 'stax-api', version: '1.0-2'
-
-  // https://mvnrepository.com/artifact/javax.xml.bind/jaxb-api
-//  implementation group: 'javax.xml.bind', name: 'jaxb-api', version: '2.2.4'
-  // https://mvnrepository.com/artifact/javax.activation/activation
-//  implementation group: 'javax.activation', name: 'activation', version: '1.1.1'
-
-//  implementation "javax.xml.bind:jaxb-api:2.3.0"
-//  implementation 'com.sun.activation:javax.activation:1.2.0'
-
-//  implementation "com.sun.xml.bind:jaxb-core:2.3.0.1"
-//  implementation "javax.xml.bind:jaxb-api:2.3.1"
-//  implementation "com.sun.xml.bind:jaxb-impl:2.3.1"
-//  implementation "org.javassist:javassist:3.25.0-GA"
-
   implementation "jakarta.xml.bind:jakarta.xml.bind-api:2.3.2"
   implementation "org.glassfish.jaxb:jaxb-runtime:2.3.2"
+
+  implementation 'org.mongodb:mongodb-driver-sync:4.11.0'
 }
 
 test {
