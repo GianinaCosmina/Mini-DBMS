@@ -37,7 +37,8 @@ public class StartApplication extends Application {
         Utils.setScenePosition(scene, primaryStage);
 
         // mongodb
-        String uri = "mongodb+srv://Gianina:GBFQibY7LGbxHKeg@cluster0.lkgygop.mongodb.net/?retryWrites=true&w=majority";
+        //String uri = "mongodb+srv://Gianina:GBFQibY7LGbxHKeg@cluster0.lkgygop.mongodb.net/?retryWrites=true&w=majority";
+        String uri = "mongodb+srv://lorenaberchesan:Lorena27@cluster0.nuasyrl.mongodb.net/?retryWrites=true&w=majority";
         MongoClient mongoClient = null;
         try {
             mongoClient = MongoClients.create(uri);

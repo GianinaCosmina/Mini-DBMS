@@ -64,6 +64,15 @@ class Table {
         }
     }
 
+    public Column getColumnByName(String name) {
+        for (Column column: this.columns) {
+            if (column.getColumnName().equalsIgnoreCase(name)) {
+                return column;
+            }
+        }
+        return null;
+    }
+
     public String getTableName() {
         return tableName;
     }

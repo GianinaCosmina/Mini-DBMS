@@ -114,4 +114,22 @@
     <database databaseName="test_gif2">
         <tables/>
     </database>
+    <database databaseName="students">
+        <tables>
+            <table tableName="disciplines" fileName="disciplines.bin">
+                <structure>
+                    <attribute columnName="discid" type="varchar" length="5"/>
+                    <attribute columnName="dname" type="varchar" length="20"/>
+                    <attribute columnName="creditnr" type="int"/>
+                </structure>
+                <primaryKey>
+                    <pkAttribute>
+                        <pkAttribute>discid</pkAttribute>
+                    </pkAttribute>
+                </primaryKey>
+                <foreignKeys/>
+                <IndexAttributes/>
+            </table>
+        </tables>
+    </database>
 </databases>
