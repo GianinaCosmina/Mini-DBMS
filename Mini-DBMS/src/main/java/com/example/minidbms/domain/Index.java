@@ -6,15 +6,15 @@ public class Index {
     private String indexName;
     private String tableName;
     private List<String> columns;
-    private String fileName;
+    private  boolean isUnique;
 
     public Index() {}
 
-    public Index(String indexName, String tableName, List<String> columns) {
+    public Index(String indexName, String tableName, List<String> columns, boolean isUnique) {
         this.indexName = indexName;
         this.tableName = tableName;
         this.columns = columns;
-        this.fileName = indexName + ".ind";
+        this.isUnique = isUnique;
     }
 
     // Getter and Setter methods for the fields
@@ -41,5 +41,13 @@ public class Index {
 
     public void setColumns(List<String> columns) {
         this.columns = columns;
+    }
+
+    public boolean isUnique() {
+        return isUnique;
+    }
+
+    public void setUnique(boolean unique) {
+        isUnique = unique;
     }
 }

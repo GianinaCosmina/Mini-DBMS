@@ -14,6 +14,8 @@ class Column {
     private String type;
     @XmlAttribute
     private Integer length;
+    @XmlAttribute
+    private Boolean unique;
 
     public Column() {
     }
@@ -21,6 +23,7 @@ class Column {
     public Column(String name, String type) {
         this.columnName = name;
         this.type = type;
+        this.unique = null;
     }
 
     public String getColumnName() {
@@ -45,5 +48,13 @@ class Column {
 
     public void setLength(Integer length) {
         this.length = length;
+    }
+
+    public Boolean getUnique() {
+        return unique;
+    }
+
+    public void setUnique(Boolean unique) {
+        this.unique = unique;
     }
 }

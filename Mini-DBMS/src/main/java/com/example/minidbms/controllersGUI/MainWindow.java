@@ -6,13 +6,16 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.result.InsertOneResult;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.Updates;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.stage.Stage;
 import org.bson.Document;
+import org.bson.conversions.Bson;
+
 import static com.mongodb.client.model.Filters.eq;
 
 import java.util.*;
@@ -199,11 +202,19 @@ public class MainWindow {
             return true;
         }
 
-        DropTable(tableName);
-        //Connecting to the database
         MongoDatabase database = mongoClient.getDatabase(crtDatabase.getDatabaseName());
-        // drop table
+
+        Table crtTable = crtDatabase.getTableByName(tableName);
+        if (!CheckFKonDeleteCollection(crtTable, database)){
+            return true;
+        }
+
+        DropTable(tableName);
+
         database.getCollection(tableName).drop();
+        for(Index index : crtTable.getIndexes()) {
+            database.getCollection(index.getIndexName()).drop();
+        }
         resultTextArea.setText("Table " + tableName + " was dropped!");
         return true;
     }
@@ -249,6 +260,9 @@ public class MainWindow {
             Pattern columnPattern = Pattern.compile("\\(((.|\\n)*)(\\);)", Pattern.DOTALL);
             Matcher columnMatcher = columnPattern.matcher(tableDefinition);
 
+            //Connecting to the database
+            MongoDatabase database = mongoClient.getDatabase(crtDatabase.getDatabaseName());
+
             if (columnMatcher.find()) {
                 String columnsDefinition = columnMatcher.group(1);
                 String[] attributeDefinitions = columnsDefinition.split(",");
@@ -263,6 +277,10 @@ public class MainWindow {
 
                     String attributeName = parts[0];
                     String attributeType = parts[1];
+                    Boolean attributeIsUnique = null;
+                    if (parts.length == 3) {
+                        attributeIsUnique = true;
+                    }
                     List<String> attributeTypeElems = new ArrayList<>();
                     Integer length = null;
                     boolean hasLength;
@@ -301,6 +319,11 @@ public class MainWindow {
                                 return true;
                             }
                             foreignKeys.add(new ForeignKey(attributeName, referencedTable, referencedAttribute.replaceAll("\\(", "")));
+                            if (attributeIsUnique == null) {
+                                //Creating a collection
+                                database.createCollection(attributeName.toLowerCase() + "_" + tableName.toLowerCase() + "_index");
+                                indexes.add(new Index(attributeName.toLowerCase() + "_" + tableName.toLowerCase() + "_index", tableName, Collections.singletonList(attributeName), false));
+                            }
                         } else {
                             resultTextArea.setText("Invalid foreign key definition: " + attributeDefinition);
                             return true;
@@ -315,7 +338,7 @@ public class MainWindow {
                             String columnsList = attributeDefinition.substring(attributeDefinition.indexOf("(") + 1, attributeDefinition.lastIndexOf(")"));
                             String[] indexedColumns = columnsList.split(",\\s*");
 
-                            indexes.add(new Index(indexName, indexTableName, Arrays.asList(indexedColumns)));
+                            indexes.add(new Index(indexName, indexTableName, Arrays.asList(indexedColumns), false));
                         } else {
                             resultTextArea.setText("Invalid index definition: " + attributeDefinition);
                             return true;
@@ -328,6 +351,12 @@ public class MainWindow {
                     if (length != null){
                         column.setLength(length);
                     }
+                    if (attributeIsUnique != null) {
+                        column.setUnique(true);
+                        //Creating a collection
+                        database.createCollection(attributeName.toLowerCase() + "_" + tableName.toLowerCase() + "_index");
+                        indexes.add(new Index(attributeName.toLowerCase() + "_" + tableName.toLowerCase() + "_index", tableName, Collections.singletonList(attributeName), true));
+                    }
                     columns.add(column);
                 }
             }
@@ -336,8 +365,6 @@ public class MainWindow {
             newTable.setIndexes(indexes);
             crtDatabase.createTable(newTable);
             saveDBMSToXML(myDBMS);
-            //Connecting to the database
-            MongoDatabase database = mongoClient.getDatabase(crtDatabase.getDatabaseName());
             //Creating a collection
             database.createCollection(tableName);
             resultTextArea.setText("Table " + tableName + " created successfully!");
@@ -346,8 +373,6 @@ public class MainWindow {
             return false;
         }
     }
-
-
 
     public boolean ProcessCreateIndex() {
         String createIndexPattern = "create index [a-zA-Z_$][a-zA-Z_$0-9]* on [a-zA-Z_$][a-zA-Z_$0-9]* \\([^)]+\\);";
@@ -383,11 +408,13 @@ public class MainWindow {
             return true;
         }
 
-        Index index = new Index(indexName, tableName, columnList);
+        Index index = new Index(indexName, tableName, columnList, false);
         Table table = crtDatabase.getTableByName(tableName);
         table.createIndex(index);
 
         saveDBMSToXML(myDBMS);
+        MongoDatabase database = mongoClient.getDatabase(crtDatabase.getDatabaseName());
+        database.createCollection(indexName);
         resultTextArea.setText("Index " + indexName + " created on table " + tableName + " with columns: " + columnList);
         return true;
     }
@@ -413,15 +440,11 @@ public class MainWindow {
         indexName = parts[2];
         tableName = parts[4].replace(";","");
 
-
-
         List<Table> tableList =  crtDatabase.getTables();
         if (!tableList.stream().map(table -> table.getTableName().toLowerCase()).toList().contains(tableName.toLowerCase())) {
             resultTextArea.setText("Table name " + tableName +" do not exist in " + crtDatabase.getDatabaseName() +" database. Try again!");
             return true;
         }
-
-
 
         Table crtTable = crtDatabase.getTableByName(tableName);
         List<Index> indexList = crtTable.getIndexes();
@@ -429,8 +452,6 @@ public class MainWindow {
             resultTextArea.setText("Index name " + indexName + " do not exist in " + tableName + " table.Try again!");
             return true;
         }
-
-
 
         DropIndex(crtTable,indexName);
         resultTextArea.setText("Index " + indexName + " was dropped!");
@@ -448,40 +469,32 @@ public class MainWindow {
             return true;
         }
         return false;
-        //if (dataTypes.stream().map(dataType -> {dataType.contains() }))
     }
 
     public boolean ProcessInsertIntoTable() {
-        // Define the regex pattern to match the INSERT INTO statement
-        //String insertPattern = "insert into [a-zA-Z_$][a-zA-Z_$0-9]* \\(([^)]*)\\) values \\(([^)]*)\\);";
         String insertPattern = "(insert into) (\\S+).*\\((.*?)\\).*(values).*\\((.*?)\\)(.*\\;?);";
 
         String tableName ;
         List <String> columnNames;
         List <String> columnValues;
 
-        // Compile the regex pattern and create a matcher
         Pattern pattern = Pattern.compile(insertPattern);
         Matcher matcher = pattern.matcher(sqlStatementTextArea.getText().toLowerCase());
 
-        // Check if the provided SQL command matches the expected pattern
         if (!matcher.matches()) {
             resultTextArea.setText("Invalid SQL command. Please provide a valid INSERT INTO statement.");
             return false;
         }
 
-        // Check if a database is selected
         if (crtDatabase == null) {
             resultTextArea.setText("Please select a database to use first!");
             return false;
         }
 
-        // Extract information from the matched SQL command
         tableName = matcher.group(2).trim();
         columnNames = Arrays.stream(matcher.group(3).split(",")).map(String::trim).toList();
         columnValues = Arrays.stream(matcher.group(5).split(",")).map(String::trim).toList();
 
-        // Check if the specified table exists in the current database
         List<Table> tableList = crtDatabase.getTables();
         if (tableList.stream().noneMatch(table -> table.getTableName().equalsIgnoreCase(tableName))) {
             resultTextArea.setText("Table " + tableName + " does not exist in the " + crtDatabase.getDatabaseName() + " database. Please try again.");
@@ -496,14 +509,9 @@ public class MainWindow {
             }
         }
 
-        // Verify the primary key constraint
-
-
         String primaryKeys = null;
         String values = null;
 
-
-        //Document document = new Document();
         for (int i=0; i<columnNames.size();i++){
             if ( crtTable.getPrimaryKeys().stream().map(primaryKey -> primaryKey.getPkAttribute().toLowerCase(Locale.ROOT)).toList().contains(columnNames.get(i).toLowerCase()) ){
                 if (primaryKeys == null){
@@ -511,56 +519,46 @@ public class MainWindow {
                 }else{
                     primaryKeys = primaryKeys + "#" + columnValues.get(i);
                 }
-            }else{
+            } else{
                 if (values == null){
                     values = columnValues.get(i);
-                }else{
+                } else{
                     values = values + "#" + columnValues.get(i);
                 }
             }
-
         }
 
-
-
-        //Connecting to the database
         MongoDatabase database = mongoClient.getDatabase(crtDatabase.getDatabaseName());
-        // drop table
         MongoCollection<Document> collection = database.getCollection(tableName);
 
         if (!isPrimaryKeyValid(crtTable, columnNames, primaryKeys, collection)) {
-
             return true;
         }
 
-        try{
-            InsertOneResult result = collection.insertOne(new Document()
-                    .append("_id", primaryKeys.toString())
-                    .append("values", values));
+        // check FK
+        if (!CheckFKonInsert(crtTable, columnNames, columnValues, database)) {
+            return true;
+        }
+
+        // insert indexes
+        if (!InsertIndexes(crtTable, columnNames, columnValues, primaryKeys, database)) {
+            return true;
+        }
+
+        try {
+            collection.insertOne(new Document().append("_id", primaryKeys).append("values", values));
         } catch (MongoException me) {
             resultTextArea.setText("Unable to insert due to an error: " + me);
         }
-
-
-        // Perform the INSERT operation in your application's data structures
-        // Insert the data into the MongoDB collection (table) or your data model
-        // ...
 
         resultTextArea.setText("Data was successfully inserted into the table " + tableName);
         return true;
     }
 
-    private boolean isPrimaryKeyValid(Table table, List <String> columnNames, String primaryKeyString , MongoCollection<Document> collection) {
-        // Implement validation logic to check if the primary key constraint is valid.
-        // You need to parse columnNames and columnValues, and identify the primary key.
-
-        // If the primary key constraint is valid, return true; otherwise, return false.
-        // You may need to check your data model and the existing records in the table.
-
-        // ...
+    private boolean isPrimaryKeyValid(Table table, List <String> columnNames, String primaryKeyString, MongoCollection<Document> collection) {
         List <PrimaryKey> primaryKeys = table.getPrimaryKeys();
         for (PrimaryKey primaryKey: primaryKeys) {
-            if ( !columnNames.stream().map(String::toLowerCase).toList().contains(primaryKey.getPkAttribute().toLowerCase()) ){
+            if (!columnNames.stream().map(String::toLowerCase).toList().contains(primaryKey.getPkAttribute().toLowerCase()) ){
                 resultTextArea.setText("Invalid list of columns. List of columns must contains all primary key fields.");
                 return false;
             }
@@ -572,39 +570,27 @@ public class MainWindow {
             return false;
         }
 
-        //Document doc = collection.aggregate(Arrays.asList(Aggregates.match(Filters.eq("key1", "value1")),
-        //        Aggregates.match(Filters.eq("key2", "value2")),
-        //        Aggregates.match(Filters.eq("key3", "value3")))).first();
-
-        return true; // For this example, we assume the primary key is valid.
+        return true;
     }
 
     public boolean ProcessDeleteFromTable() {
-        // Define the regex pattern to match the INSERT INTO statement
-        //String insertPattern = "insert into [a-zA-Z_$][a-zA-Z_$0-9]* \\(([^)]*)\\) values \\(([^)]*)\\);";
         String deletePattern = "(delete(\\s+)from)(\\s+)(\\S+)(\\s+)(where)(\\s+)(\\S+)(\\s+)(=)(\\s+)(\\S+).*;";
 
         String tableName;
-        List<String> columnNames;
-        List<String> columnValues;
 
-        // Compile the regex pattern and create a matcher
         Pattern pattern = Pattern.compile(deletePattern);
         Matcher matcher = pattern.matcher(sqlStatementTextArea.getText().toLowerCase());
 
-        // Check if the provided SQL command matches the expected pattern
         if (!matcher.matches()) {
             resultTextArea.setText("Invalid SQL command. Please provide a valid INSERT INTO statement.");
             return false;
         }
 
-        // Check if a database is selected
         if (crtDatabase == null) {
             resultTextArea.setText("Please select a database to use first!");
             return false;
         }
 
-        // Extract information from the matched SQL command
         tableName = matcher.group(4).trim();
         String columnPK = matcher.group(8).trim();
         String columnValue = matcher.group(12).trim();
@@ -621,15 +607,132 @@ public class MainWindow {
             resultTextArea.setText("Column " + columnPK + " does not exist in the " + crtTable.getTableName() + " table. Please try again.");
             return false;
         }
-        //Connecting to the database
+
         MongoDatabase database = mongoClient.getDatabase(crtDatabase.getDatabaseName());
-        // Creating a collection
         MongoCollection<Document> collection = database.getCollection(tableName);
-        //Deleting a document
+
+        // check FK
+        if (!CheckFKonDeleteDocument(crtTable, columnPK, columnValue, database)) {
+            return true;
+        }
+
+        // delete indexes
+        DeleteIndexes(crtTable, columnPK, columnValue, database);
+
         collection.deleteOne(Filters.eq("_id", columnValue));
         resultTextArea.setText("Data was successfully deleted from the table " + tableName);
         return true;
     }
 
+    private boolean InsertIndexes(Table crtTable, List<String> columnNames, List<String> columnValues, String primaryKeys, MongoDatabase database) {
+        for (Index index : crtTable.getIndexes()) {
+            String indexID = null;
+            for(String column : index.getColumns()) {
+                for (int i = 0; i < columnNames.size(); i++) {
+                    if (columnNames.get(i).equalsIgnoreCase(column)) {
+                        if (indexID != null) {
+                            indexID = indexID + "#" + columnValues.get(i);
+                        } else {
+                            indexID = columnValues.get(i);
+                        }
+                    }
+                }
+            }
+            MongoCollection<Document> collection = database.getCollection(index.getIndexName());
+            Document doc = collection.find(eq("_id", indexID)).first();
+            if (doc != null) {
+                if (index.isUnique()) {
+                    resultTextArea.setText("Unique key violation: A record with the same value already exists.");
+                    return false;
+                }
+                String values = (String) doc.get("values");
+                Bson updates = Updates.combine(Updates.set("values", values + "$" + primaryKeys));
+                UpdateOptions options = new UpdateOptions().upsert(true);
+                collection.updateOne(doc, updates, options);
+            } else {
+                collection.insertOne(new Document()
+                        .append("_id", indexID)
+                        .append("values", primaryKeys));
+            }
+        }
 
+        return true;
+    }
+
+    private boolean CheckFKonInsert(Table crtTable, List<String> columnNames, List<String> columnValues, MongoDatabase database) {
+        if (crtTable.getForeignKeys().size() == 0) {
+            return true;
+        }
+        for(ForeignKey foreignKey : crtTable.getForeignKeys()) {
+            for (int i = 0; i < columnNames.size(); i++) {
+                if (columnNames.get(i).equalsIgnoreCase(foreignKey.getFkAttribute())) {
+                    Table refTable = crtDatabase.getTableByName(foreignKey.getRefTable());
+                    MongoCollection<Document> collection = database.getCollection(refTable.getTableName());
+                    Document doc = collection.find(eq("_id", columnValues.get(i))).first();
+                    if (doc != null) {
+                        return true;
+                    }
+                    for (Index index : refTable.getIndexes()) {
+                        collection = database.getCollection(index.getIndexName());
+                        doc = collection.find(eq("_id", columnValues.get(i))).first();
+                        if (doc != null) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        resultTextArea.setText("Foreign Key constraint failure.");
+        return false;
+    }
+
+    private void DeleteIndexes(Table crtTable, String columnName, String columnValue, MongoDatabase database) {
+        for (Index index : crtTable.getIndexes()) {
+            MongoCollection<Document> collection = database.getCollection(index.getIndexName());
+            Document doc = collection.find(eq("values", columnValue)).first();
+            if (doc != null) {
+                collection.deleteOne(Filters.eq("values", columnValue));
+                return;
+            }
+//            doc = collection.find(Filters.regex("values",
+//                    "/^(" + columnValue + ")$|(\\$" + columnValue + "\\$)|^(" + columnValue + "\\$)|(\\$" + columnValue + ")$/gm")).first();
+//            if (doc != null) {
+//                collection.deleteOne(Filters.eq("values", columnValue));
+//                return;
+//            }
+        }
+    }
+
+    private boolean CheckFKonDeleteDocument(Table crtTable, String columnName, String columnValue, MongoDatabase database) {
+        for (Table table : crtDatabase.getTables()) {
+            for (ForeignKey foreignKey : table.getForeignKeys()) {
+                if (foreignKey.getRefTable().equalsIgnoreCase(crtTable.getTableName())) {
+                    if (foreignKey.getRefAttribute().equalsIgnoreCase(columnName)) {
+                        MongoCollection<Document> collection = database.getCollection(foreignKey.getRefTable());
+                        Document doc = collection.find(eq("_id", columnValue)).first();
+                        if (doc != null) {
+                            resultTextArea.setText("Foreign Key constraint failure.");
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private boolean CheckFKonDeleteCollection(Table crtTable, MongoDatabase database) {
+        for (Table table : crtDatabase.getTables()) {
+            for (ForeignKey foreignKey : table.getForeignKeys()) {
+                if (foreignKey.getRefTable().equalsIgnoreCase(crtTable.getTableName())) {
+                    resultTextArea.setText("Foreign Key constraint failure.");
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
 }
