@@ -13,6 +13,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.stage.Stage;
+import javafx.util.Pair;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
@@ -768,7 +769,7 @@ public class MainWindow {
     }
 
     public boolean ProcessSelectFromTable() {
-        String selectPattern = "^select\\s+(?:distinct\\s+)?([\\w()]+(?:\\s*,\\s*[\\w()]+)*)\\s+from\\s+(\\w+\\s*(?:,\\s*\\w+\\s*)*)\\s*;$";
+        String selectPattern = "^\\s*(select)(\\s+)(distinct)?(\\s+)?((?:\\w+\\.\\w+|[\\w\\*]+(?:\\s*,\\s*\\w+\\.\\w+|\\s*,\\s*[\\w\\*]+)*))(\\s+)(from)(\\s+)(\\w+\\s*(?:,\\s*\\w+\\s*)*)(\\s*)(?:(where)(\\s+)((.|\\n)*))?;";
 
         Pattern pattern = Pattern.compile(selectPattern, Pattern.CASE_INSENSITIVE);
         Matcher matcher = pattern.matcher(sqlStatementTextArea.getText().toLowerCase());
@@ -782,36 +783,84 @@ public class MainWindow {
             return true;
         }
 
-        String columns = matcher.group(3);
-        String tableName = matcher.group(6);
-        String whereClause = matcher.group(9);
-
-        List<String> selectedColumns;
-        if (columns.equals("*")) {
-            selectedColumns = null; // Select all columns
-        } else {
-            selectedColumns = List.of(columns.split(","));
+        // is distinct
+        String isDistinctString = matcher.group(3);
+        boolean isDistinct = false;
+        if (isDistinctString != null) {
+            isDistinct = true;
         }
 
-        Table crtTable = crtDatabase.getTableByName(tableName);
-        if (crtTable == null) {
-            resultTextArea.setText("Table " + tableName + " does not exist in the " + crtDatabase.getDatabaseName() + " database.");
-            return true;
+        // tables in which to search
+        String tablesInWhichToSearch = matcher.group(9);
+        if (tablesInWhichToSearch != null) {
+            tablesInWhichToSearch = tablesInWhichToSearch.trim();
         }
+        List<String> tablesInWhichToSearchList = Arrays.stream(tablesInWhichToSearch.split(",")).map(s -> s.trim()).toList();
+
+        // columns to show
+        String columnsToShow = matcher.group(5);
+        if (columnsToShow != null) {
+            columnsToShow = columnsToShow.trim();
+        }
+        List<String> columnsToShowAux = Arrays.stream(columnsToShow.split(",")).map(s -> s.trim()).toList();
+        List<Pair<String,String>> columnAndTableList = new ArrayList<>();
+        for (String column: columnsToShowAux) {
+            if (column.contains(".")) {
+                List<String> columnAndTable = List.of(column.split("."));
+                columnAndTableList.add(new Pair<>(columnAndTable.get(0), columnAndTable.get(1)));
+            } else {
+                columnAndTableList.add(new Pair<>(column.trim(), tablesInWhichToSearchList.get(0)));
+            }
+        }
+
+        // where clauses
+        String whereClause = matcher.group(13);
+        if (whereClause != null) {
+            whereClause = whereClause.trim();
+        }
+
+        for (String tableName: tablesInWhichToSearchList) {
+            Table crtTable = crtDatabase.getTableByName(tableName);
+            if (crtTable == null) {
+                resultTextArea.setText("Table " + tableName + " does not exist in the " + crtDatabase.getDatabaseName() + " database.");
+                return true;
+            }
+        }
+
+//        MongoCollection<Document> collection = database.getCollection(tableName);
+//
+//        List<Document> resultDocuments;
+//        if (whereClause != null && !whereClause.trim().isEmpty()) {
+//            // Implement logic to parse and execute WHERE conditions
+//            resultDocuments = ExecuteWhereCondition(collection, whereClause);
+//        } else {
+//            resultDocuments = collection.find().into(new ArrayList<>());
+//        }
+//
+//        // Display query results
+//        DisplayQueryResults(resultDocuments, columnAndTableList);
 
         MongoDatabase database = mongoClient.getDatabase(crtDatabase.getDatabaseName());
-        MongoCollection<Document> collection = database.getCollection(tableName);
 
-        List<Document> resultDocuments;
+        List<Document> resultDocuments = null;
+        List<Document> resultDocumentsList = null;
         if (whereClause != null && !whereClause.trim().isEmpty()) {
-            // Implement logic to parse and execute WHERE conditions
-            resultDocuments = ExecuteWhereCondition(collection, whereClause);
+            // Implement logic to parse and execute WHERE conditions // TODO
+//            resultDocuments = ExecuteWhereCondition(collection, whereClause);
         } else {
-            resultDocuments = collection.find().into(new ArrayList<>());
+            for (String tableName: tablesInWhichToSearchList) {
+                MongoCollection<Document> collection = database.getCollection(tableName);
+                resultDocuments = collection.find().into(new ArrayList<>());
+            }
+            if (resultDocumentsList == null) {
+                resultDocumentsList = resultDocuments;
+            } else {
+                resultDocumentsList.addAll(resultDocuments);
+            }
         }
 
         // Display query results
-        DisplayQueryResults(resultDocuments, selectedColumns);
+        DisplayQueryResults(resultDocumentsList, columnAndTableList, isDistinct);
 
         return true;
     }
@@ -832,7 +881,7 @@ public class MainWindow {
         return new ArrayList<>();
     }
 
-    private void DisplayQueryResults(List<Document> resultDocuments, List<String> selectedColumns) {
+    private void DisplayQueryResults(List<Document> resultDocuments, List<Pair<String, String>> selectedColumns, boolean isDistinct) {
         // Implement logic to display query results
         StringBuilder resultStringBuilder = new StringBuilder();
 
@@ -842,8 +891,39 @@ public class MainWindow {
                 resultStringBuilder.append(document.toJson()).append("\n");
             } else {
                 // Display selected columns
-                for (String column : selectedColumns) {
-                    resultStringBuilder.append(column).append(": ").append(document.get(column)).append(", ");
+                for (Pair<String, String> column : selectedColumns) {
+                    List<String> ids = Arrays.stream(document.get("_id").toString().split("#")).toList();
+                    List<String> values = Arrays.stream(document.get("values").toString().split("#")).toList();
+                    Table crtTable = crtDatabase.getTableByName(column.getValue());
+
+                    if (Objects.equals(column.getKey(), "*")) {
+                        int index = 0;
+                        boolean valueSet = false;
+                        List<String> columnsAlreadyChecked = new ArrayList<>();
+                        for (PrimaryKey pk : crtTable.getPrimaryKeys()) {
+                            columnsAlreadyChecked.add(pk.getPkAttribute());
+                            if (Objects.equals(pk.getPkAttribute(), column.getKey())) {
+                                resultStringBuilder.append(column.getKey()).append(": ").append(ids.get(index)).append(", ");
+                                valueSet = true;
+                                break;
+                            }
+                            index++;
+                        }
+                        index = 0;
+                        if (!valueSet) {
+                            for (Column col : crtTable.getColumns()) {
+                                if (!columnsAlreadyChecked.contains(col.getColumnName())) {
+                                    if (Objects.equals(col.getColumnName(), column.getKey())) {
+                                        resultStringBuilder.append(column.getKey()).append(": ").append(values.get(index)).append(", ");
+                                        break;
+                                    }
+                                    index++;
+                                }
+                            }
+                        }
+                    } else {
+                        // TODO
+                    }
                 }
                 resultStringBuilder.setLength(resultStringBuilder.length() - 2); // Remove trailing comma and space
                 resultStringBuilder.append("\n");
