@@ -17,11 +17,14 @@ import javafx.util.Pair;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
+import javax.print.Doc;
+
 import static com.mongodb.client.model.Filters.eq;
 
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static com.example.minidbms.utils.Utils.saveDBMSToXML;
 
@@ -832,8 +835,7 @@ public class MainWindow {
         List<Document> resultDocuments = null;
         List<Document> resultDocumentsList = null;
         if (whereClause != null && !whereClause.trim().isEmpty()) {
-//             Implement logic to parse and execute WHERE conditions // TODO
-            resultDocumentsList = ExecuteWhereCondition(whereClause, tablesInWhichToSearchList, database);
+            resultDocumentsList = ExecuteMultipleWhereCondition(whereClause.toLowerCase(), tablesInWhichToSearchList, database);
         } else {
             for (String tableName: tablesInWhichToSearchList) {
                 MongoCollection<Document> collection = database.getCollection(tableName);
@@ -851,6 +853,25 @@ public class MainWindow {
         DisplayQueryResults(resultDocumentsList, columnAndTableList, isDistinct);
 
         return true;
+    }
+
+    private List<Document> ExecuteMultipleWhereCondition(String whereClause, List<String> tablesInWhichToSearchList, MongoDatabase database) {
+        List<String> whereClauses = List.of(whereClause.split("and"));
+        List<Document> documents;
+        List<Document> finalDocuments = new ArrayList<>();
+        for(String clause : whereClauses) {
+            documents = ExecuteWhereCondition(clause, tablesInWhichToSearchList, database);
+            if (finalDocuments.isEmpty()) {
+                finalDocuments = documents;
+            } else {
+                finalDocuments = finalDocuments.stream()
+                        .distinct()
+                        .filter(documents::contains)
+                        .collect(Collectors.toSet()).stream().toList();
+            }
+        }
+
+        return finalDocuments;
     }
 
     private List<Document> ExecuteWhereCondition(String whereClause, List<String> tablesInWhichToSearchList, MongoDatabase database) {
