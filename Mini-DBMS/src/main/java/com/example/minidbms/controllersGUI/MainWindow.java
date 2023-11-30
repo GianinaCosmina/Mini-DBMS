@@ -856,8 +856,26 @@ public class MainWindow {
     private List<Document> ExecuteWhereCondition(String whereClause, List<String> tablesInWhichToSearchList, MongoDatabase database) {
         // Implement logic to parse and execute WHERE conditions
         // For simplicity, let's assume a basic condition, e.g., "columnName = 'value'"
-        String[] parts = whereClause.split("=");
-        parts = whereClause.split("like");
+        String condition = null;
+        if (whereClause.contains("=")) {
+            condition = "=";
+        }
+        if (whereClause.contains("like")) {
+            condition = "like";
+        }
+        if (whereClause.contains("<")) {
+            condition = "<";
+        }
+        if (whereClause.contains(">")) {
+            condition = ">";
+        }
+        if (whereClause.contains("<=")) {
+            condition = "<=";
+        }
+        if (whereClause.contains(">=")) {
+            condition = ">=";
+        }
+        String[] parts = whereClause.split(condition);
         List<Document> resultDocuments = new ArrayList<>();
 
         if (parts.length == 2) {
@@ -880,7 +898,13 @@ public class MainWindow {
             for(Index index : crtTable.getIndexes()) {
                 if (index.getColumns().get(0).equalsIgnoreCase(columnName)) {
                     MongoCollection<Document> collection = database.getCollection(tableName + "_" + columnName + "_index");
-                    docs = collection.find(Filters.eq("_id", value)).into(new ArrayList<>());
+                    switch (condition) {
+                        case "=", "like" -> docs.addAll(collection.find(Filters.eq("_id", value)).into(new ArrayList<>()));
+                        case "<" -> docs.addAll(collection.find(Filters.lt("_id", value)).into(new ArrayList<>()));
+                        case ">" -> docs.addAll(collection.find(Filters.gt("_id", value)).into(new ArrayList<>()));
+                        case "<=" -> docs.addAll(collection.find(Filters.lte("_id", value)).into(new ArrayList<>()));
+                        case ">=" -> docs.addAll(collection.find(Filters.gte("_id", value)).into(new ArrayList<>()));
+                    }
                     thereIsIndex = true;
                 }
             }
@@ -900,7 +924,7 @@ public class MainWindow {
             if (thereIsIndex) {
                 for (Document doc : docs) {
                     MongoCollection<Document> collection = database.getCollection(tableName);
-                    resultDocuments = collection.find(Filters.eq("_id", doc.get("values"))).into(new ArrayList<>());
+                    resultDocuments.addAll(collection.find(Filters.eq("_id", doc.get("values"))).into(new ArrayList<>()));
                 }
             }
         }
