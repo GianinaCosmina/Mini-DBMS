@@ -2,6 +2,115 @@
 <databases>
     <database databaseName="students">
         <tables>
+            <table tableName="specialization" fileName="specialization.bin">
+                <structure>
+                    <attribute columnName="specid" type="varchar" length="5"/>
+                    <attribute columnName="specname" type="varchar" length="40"/>
+                    <attribute columnName="language" type="varchar" length="20"/>
+                </structure>
+                <primaryKey>
+                    <pkAttribute>
+                        <pkAttribute>specid</pkAttribute>
+                    </pkAttribute>
+                </primaryKey>
+                <foreignKeys/>
+                <IndexAttributes/>
+            </table>
+            <table tableName="groups" fileName="groups.bin">
+                <structure>
+                    <attribute columnName="groupid" type="int"/>
+                    <attribute columnName="specid" type="varchar" length="20"/>
+                </structure>
+                <primaryKey>
+                    <pkAttribute>
+                        <pkAttribute>groupid</pkAttribute>
+                    </pkAttribute>
+                </primaryKey>
+                <foreignKeys>
+                    <foreignKey>
+                        <fkAttribute>specid</fkAttribute>
+                        <refAttribute>specid</refAttribute>
+                        <refTable>specialization</refTable>
+                    </foreignKey>
+                </foreignKeys>
+                <IndexAttributes>
+                    <IndexAttribute>
+                        <columns>specid</columns>
+                        <indexName>groups_specid_index</indexName>
+                        <tableName>groups</tableName>
+                        <unique>false</unique>
+                    </IndexAttribute>
+                </IndexAttributes>
+            </table>
+            <table tableName="students" fileName="students.bin">
+                <structure>
+                    <attribute columnName="studid" type="int"/>
+                    <attribute columnName="groupid" type="int"/>
+                    <attribute columnName="studname" type="varchar" length="20"/>
+                    <attribute columnName="email" type="varchar" length="20"/>
+                </structure>
+                <primaryKey>
+                    <pkAttribute>
+                        <pkAttribute>studid</pkAttribute>
+                    </pkAttribute>
+                </primaryKey>
+                <foreignKeys>
+                    <foreignKey>
+                        <fkAttribute>groupid</fkAttribute>
+                        <refAttribute>groupid</refAttribute>
+                        <refTable>groups</refTable>
+                    </foreignKey>
+                </foreignKeys>
+                <IndexAttributes>
+                    <IndexAttribute>
+                        <columns>groupid</columns>
+                        <indexName>students_groupid_index</indexName>
+                        <tableName>students</tableName>
+                        <unique>false</unique>
+                    </IndexAttribute>
+                </IndexAttributes>
+            </table>
+            <table tableName="marks" fileName="marks.bin">
+                <structure>
+                    <attribute columnName="studid" type="int"/>
+                    <attribute columnName="discid" type="varchar" length="20"/>
+                    <attribute columnName="mark" type="int"/>
+                </structure>
+                <primaryKey>
+                    <pkAttribute>
+                        <pkAttribute>studid</pkAttribute>
+                    </pkAttribute>
+                    <pkAttribute>
+                        <pkAttribute>discid</pkAttribute>
+                    </pkAttribute>
+                </primaryKey>
+                <foreignKeys>
+                    <foreignKey>
+                        <fkAttribute>studid</fkAttribute>
+                        <refAttribute>studid</refAttribute>
+                        <refTable>students</refTable>
+                    </foreignKey>
+                    <foreignKey>
+                        <fkAttribute>discid</fkAttribute>
+                        <refAttribute>discid</refAttribute>
+                        <refTable>disciplines</refTable>
+                    </foreignKey>
+                </foreignKeys>
+                <IndexAttributes>
+                    <IndexAttribute>
+                        <columns>studid</columns>
+                        <indexName>marks_studid_index</indexName>
+                        <tableName>marks</tableName>
+                        <unique>false</unique>
+                    </IndexAttribute>
+                    <IndexAttribute>
+                        <columns>discid</columns>
+                        <indexName>marks_discid_index</indexName>
+                        <tableName>marks</tableName>
+                        <unique>false</unique>
+                    </IndexAttribute>
+                </IndexAttributes>
+            </table>
             <table tableName="disciplines" fileName="disciplines.bin">
                 <structure>
                     <attribute columnName="discid" type="varchar" length="5"/>
@@ -14,21 +123,7 @@
                     </pkAttribute>
                 </primaryKey>
                 <foreignKeys/>
-                <IndexAttributes>
-                    <IndexAttribute>
-                        <columns>DiscID</columns>
-                        <columns>DName</columns>
-                        <indexName>idx_lastname</indexName>
-                        <tableName>disciplines</tableName>
-                        <unique>false</unique>
-                    </IndexAttribute>
-                    <IndexAttribute>
-                        <columns>DName</columns>
-                        <indexName>idx_NAME</indexName>
-                        <tableName>disciplines</tableName>
-                        <unique>false</unique>
-                    </IndexAttribute>
-                </IndexAttributes>
+                <IndexAttributes/>
             </table>
         </tables>
     </database>

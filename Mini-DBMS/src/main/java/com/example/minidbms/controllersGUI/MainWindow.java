@@ -48,6 +48,9 @@ public class MainWindow {
     }
 
     public void ProcessSqlStatement() {
+        if (ProcessInsertData()) {
+            return;
+        }
         if (ProcessUseDatabase()) {
             return;
         }
@@ -69,10 +72,13 @@ public class MainWindow {
         if (ProcessDropIndex()) {
             return;
         }
-        if (ProcessInsertIntoTable()){
+        if (ProcessInsertIntoTable(sqlStatementTextArea.getText())){
             return;
         }
         if (ProcessDeleteFromTable()){
+            return;
+        }
+        if (ProcessSelectFromTable()) {
             return;
         }
         else {
@@ -227,7 +233,7 @@ public class MainWindow {
     public boolean ProcessCreateTable() {
         String sql = sqlStatementTextArea.getText().toLowerCase();
 
-        String createTablePattern = "create table [a-zA-Z_$][a-zA-Z_$0-9]*\\s*\\([^;]+?\\);";
+        String createTablePattern = "create table ([a-zA-Z_$][a-zA-Z_$0-9]*)\\s*\\((.*?)\\);";
         String tableName = "";
         List<Column> columns = new ArrayList<>();
         List<PrimaryKey> primaryKeys = new ArrayList<>();
@@ -251,21 +257,21 @@ public class MainWindow {
                 tableName = tableNameMatcher.group(1);
             }
 
-            List<Table> tableList =  crtDatabase.getTables();
+            List<Table> tableList = crtDatabase.getTables();
             if (tableList.stream().map(table -> table.getTableName().toLowerCase()).toList().contains(tableName.toLowerCase())) {
-                resultTextArea.setText("Table name " + tableName +" already exist in " + crtDatabase.getDatabaseName() +" database. Try again!");
+                resultTextArea.setText("Table name " + tableName + " already exists in " + crtDatabase.getDatabaseName() + " database. Try again!");
                 return true;
             }
 
             Pattern columnPattern = Pattern.compile("\\(((.|\\n)*)(\\);)", Pattern.DOTALL);
             Matcher columnMatcher = columnPattern.matcher(tableDefinition);
 
-            //Connecting to the database
+            // Connecting to the database
             MongoDatabase database = mongoClient.getDatabase(crtDatabase.getDatabaseName());
 
             if (columnMatcher.find()) {
                 String columnsDefinition = columnMatcher.group(1);
-                String[] attributeDefinitions = columnsDefinition.split(",");
+                String[] attributeDefinitions = columnsDefinition.split(",\\n");
 
                 for (String attributeDefinition : attributeDefinitions) {
                     String[] parts = attributeDefinition.trim().split("\\s+");
@@ -278,24 +284,36 @@ public class MainWindow {
                     String attributeName = parts[0];
                     String attributeType = parts[1];
                     Boolean attributeIsUnique = null;
-                    if (parts.length == 3) {
+                    if (Arrays.stream(parts).toList().contains("unique")) {
                         attributeIsUnique = true;
                     }
-                    List<String> attributeTypeElems = new ArrayList<>();
+
                     Integer length = null;
-                    boolean hasLength;
-                    if ( attributeType.contains("(")){
-                        length = Integer.parseInt(attributeType.split("\\(")[1].replaceAll("\\)",""));
+                    if (attributeType.contains("(")) {
+                        length = Integer.parseInt(attributeType.split("\\(")[1].replaceAll("\\)", ""));
                         attributeType = attributeType.split("\\(")[0];
                     }
 
-                    if (!ValidateDataType(attributeType)) {
-                        resultTextArea.setText("Invalid dataType: " + attributeType);
-                        return true;
+                    if (!attributeDefinition.toLowerCase().trim().startsWith("primary key")) {
+                        if (!ValidateDataType(attributeType)) {
+                            resultTextArea.setText("Invalid dataType: " + attributeType);
+                            return true;
+                        }
                     }
 
                     if (attributeDefinition.toLowerCase().contains("primary key")) {
-                        primaryKeys.add(new PrimaryKey(attributeName));
+                        if (attributeDefinition.toLowerCase().trim().startsWith("primary key")) {
+                            String primaryKeyColumns = attributeDefinition.substring(attributeDefinition.indexOf("(") + 1, attributeDefinition.lastIndexOf(")"));
+                            String[] primaryKeyColumnNames = primaryKeyColumns.split(",");
+
+                            List<String> primaryKeyColumnsList = Arrays.stream(primaryKeyColumnNames).map(String::trim).toList();
+
+                            for (String primaryKeyColumn : primaryKeyColumnsList) {
+                                primaryKeys.add(new PrimaryKey(primaryKeyColumn));
+                            }
+                        } else {
+                            primaryKeys.add(new PrimaryKey(attributeName));
+                        }
                     }
 
                     if (attributeDefinition.toLowerCase().contains("references")) {
@@ -306,23 +324,22 @@ public class MainWindow {
                             String referencedTable = fkParts[3];
                             String referencedAttribute = fkParts[4].replaceAll("\\)", "");
 
-
                             if (!crtDatabase.getTables().stream().map(table -> table.getTableName().toLowerCase()).toList().contains(referencedTable.toLowerCase())) {
-                                resultTextArea.setText("Table name " + referencedTable +" do not exist in " + crtDatabase.getDatabaseName() +" database. Try again!");
+                                resultTextArea.setText("Table name " + referencedTable + " does not exist in " + crtDatabase.getDatabaseName() + " database. Try again!");
                                 return true;
                             }
 
                             Table crtTable = crtDatabase.getTableByName(referencedTable);
                             List<Column> tableColumns = crtTable.getColumns();
-                            if (!tableColumns.stream().map(column -> column.getColumnName().toLowerCase()).toList().contains(referencedAttribute.replaceAll("\\(", "").toLowerCase(Locale.ROOT))){
-                                resultTextArea.setText("Index name " + referencedAttribute.replaceAll("\\(", "") + " do not exist in " + referencedTable + " table.Try again!");
+                            if (!tableColumns.stream().map(column -> column.getColumnName().toLowerCase()).toList().contains(referencedAttribute.replaceAll("\\(", "").toLowerCase(Locale.ROOT))) {
+                                resultTextArea.setText("Index name " + referencedAttribute.replaceAll("\\(", "") + " does not exist in " + referencedTable + " table. Try again!");
                                 return true;
                             }
                             foreignKeys.add(new ForeignKey(attributeName, referencedTable, referencedAttribute.replaceAll("\\(", "")));
                             if (attributeIsUnique == null) {
-                                //Creating a collection
-                                database.createCollection(attributeName.toLowerCase() + "_" + tableName.toLowerCase() + "_index");
-                                indexes.add(new Index(attributeName.toLowerCase() + "_" + tableName.toLowerCase() + "_index", tableName, Collections.singletonList(attributeName), false));
+                                // Creating a collection
+                                database.createCollection(tableName.toLowerCase() + "_" + attributeName.toLowerCase() + "_index");
+                                indexes.add(new Index(tableName.toLowerCase() + "_" + attributeName.toLowerCase() + "_index", tableName, Collections.singletonList(attributeName), false));
                             }
                         } else {
                             resultTextArea.setText("Invalid foreign key definition: " + attributeDefinition);
@@ -345,19 +362,21 @@ public class MainWindow {
                         }
                     }
 
-                    Column column = new Column();
-                    column.setColumnName(attributeName);
-                    column.setType(attributeType);
-                    if (length != null){
-                        column.setLength(length);
+                    if (!attributeDefinition.toLowerCase().trim().startsWith("primary key")) {
+                        Column column = new Column();
+                        column.setColumnName(attributeName);
+                        column.setType(attributeType);
+                        if (length != null) {
+                            column.setLength(length);
+                        }
+                        if (attributeIsUnique != null) {
+                            column.setUnique(true);
+                            // Creating a collection
+                            database.createCollection(tableName.toLowerCase() + "_" + attributeName.toLowerCase() + "_index");
+                            indexes.add(new Index(tableName.toLowerCase() + "_" + attributeName.toLowerCase() + "_index", tableName, Collections.singletonList(attributeName), true));
+                        }
+                        columns.add(column);
                     }
-                    if (attributeIsUnique != null) {
-                        column.setUnique(true);
-                        //Creating a collection
-                        database.createCollection(attributeName.toLowerCase() + "_" + tableName.toLowerCase() + "_index");
-                        indexes.add(new Index(attributeName.toLowerCase() + "_" + tableName.toLowerCase() + "_index", tableName, Collections.singletonList(attributeName), true));
-                    }
-                    columns.add(column);
                 }
             }
 
@@ -365,7 +384,7 @@ public class MainWindow {
             newTable.setIndexes(indexes);
             crtDatabase.createTable(newTable);
             saveDBMSToXML(myDBMS);
-            //Creating a collection
+            // Creating a collection
             database.createCollection(tableName);
             resultTextArea.setText("Table " + tableName + " created successfully!");
             return true;
@@ -471,7 +490,7 @@ public class MainWindow {
         return false;
     }
 
-    public boolean ProcessInsertIntoTable() {
+    public boolean ProcessInsertIntoTable(String SqlStatement) {
         String insertPattern = "(insert into) (\\S+).*\\((.*?)\\).*(values).*\\((.*?)\\)(.*\\;?);";
 
         String tableName ;
@@ -479,10 +498,9 @@ public class MainWindow {
         List <String> columnValues;
 
         Pattern pattern = Pattern.compile(insertPattern);
-        Matcher matcher = pattern.matcher(sqlStatementTextArea.getText().toLowerCase());
+        Matcher matcher = pattern.matcher(SqlStatement.toLowerCase());
 
         if (!matcher.matches()) {
-            resultTextArea.setText("Invalid SQL command. Please provide a valid INSERT INTO statement.");
             return false;
         }
 
@@ -582,7 +600,6 @@ public class MainWindow {
         Matcher matcher = pattern.matcher(sqlStatementTextArea.getText().toLowerCase());
 
         if (!matcher.matches()) {
-            resultTextArea.setText("Invalid SQL command. Please provide a valid INSERT INTO statement.");
             return false;
         }
 
@@ -663,28 +680,33 @@ public class MainWindow {
         if (crtTable.getForeignKeys().size() == 0) {
             return true;
         }
+        boolean found;
         for(ForeignKey foreignKey : crtTable.getForeignKeys()) {
+            found = false;
             for (int i = 0; i < columnNames.size(); i++) {
                 if (columnNames.get(i).equalsIgnoreCase(foreignKey.getFkAttribute())) {
                     Table refTable = crtDatabase.getTableByName(foreignKey.getRefTable());
                     MongoCollection<Document> collection = database.getCollection(refTable.getTableName());
                     Document doc = collection.find(eq("_id", columnValues.get(i))).first();
                     if (doc != null) {
-                        return true;
+                        found = true;
                     }
                     for (Index index : refTable.getIndexes()) {
                         collection = database.getCollection(index.getIndexName());
                         doc = collection.find(eq("_id", columnValues.get(i))).first();
                         if (doc != null) {
-                            return true;
+                            found = true;
                         }
                     }
                 }
             }
+            if (!found) {
+                resultTextArea.setText("Foreign Key constraint failure.");
+                return false;
+            }
         }
 
-        resultTextArea.setText("Foreign Key constraint failure.");
-        return false;
+        return true;
     }
 
     private void DeleteIndexes(Table crtTable, String columnName, String columnValue, MongoDatabase database) {
@@ -742,6 +764,159 @@ public class MainWindow {
             }
         }
 
+        return true;
+    }
+
+    public boolean ProcessSelectFromTable() {
+        String selectPattern = "^select\\s+(?:distinct\\s+)?([\\w()]+(?:\\s*,\\s*[\\w()]+)*)\\s+from\\s+(\\w+\\s*(?:,\\s*\\w+\\s*)*)\\s*;$";
+
+        Pattern pattern = Pattern.compile(selectPattern, Pattern.CASE_INSENSITIVE);
+        Matcher matcher = pattern.matcher(sqlStatementTextArea.getText().toLowerCase());
+
+        if (!matcher.matches()) {
+            return false;
+        }
+
+        if (crtDatabase == null) {
+            resultTextArea.setText("Please select a database to use first!");
+            return true;
+        }
+
+        String columns = matcher.group(3);
+        String tableName = matcher.group(6);
+        String whereClause = matcher.group(9);
+
+        List<String> selectedColumns;
+        if (columns.equals("*")) {
+            selectedColumns = null; // Select all columns
+        } else {
+            selectedColumns = List.of(columns.split(","));
+        }
+
+        Table crtTable = crtDatabase.getTableByName(tableName);
+        if (crtTable == null) {
+            resultTextArea.setText("Table " + tableName + " does not exist in the " + crtDatabase.getDatabaseName() + " database.");
+            return true;
+        }
+
+        MongoDatabase database = mongoClient.getDatabase(crtDatabase.getDatabaseName());
+        MongoCollection<Document> collection = database.getCollection(tableName);
+
+        List<Document> resultDocuments;
+        if (whereClause != null && !whereClause.trim().isEmpty()) {
+            // Implement logic to parse and execute WHERE conditions
+            resultDocuments = ExecuteWhereCondition(collection, whereClause);
+        } else {
+            resultDocuments = collection.find().into(new ArrayList<>());
+        }
+
+        // Display query results
+        DisplayQueryResults(resultDocuments, selectedColumns);
+
+        return true;
+    }
+
+    private List<Document> ExecuteWhereCondition(MongoCollection<Document> collection, String whereClause) {
+        // Implement logic to parse and execute WHERE conditions
+        // For simplicity, let's assume a basic condition, e.g., "columnName = 'value'"
+        String[] parts = whereClause.split("=");
+        if (parts.length == 2) {
+            String columnName = parts[0].trim();
+            String value = parts[1].trim().replaceAll("'", "");
+
+            return collection.find(Filters.eq(columnName, value)).into(new ArrayList<>());
+        }
+
+        // Handle more complex conditions as needed
+
+        return new ArrayList<>();
+    }
+
+    private void DisplayQueryResults(List<Document> resultDocuments, List<String> selectedColumns) {
+        // Implement logic to display query results
+        StringBuilder resultStringBuilder = new StringBuilder();
+
+        for (Document document : resultDocuments) {
+            if (selectedColumns == null) {
+                // Display all columns
+                resultStringBuilder.append(document.toJson()).append("\n");
+            } else {
+                // Display selected columns
+                for (String column : selectedColumns) {
+                    resultStringBuilder.append(column).append(": ").append(document.get(column)).append(", ");
+                }
+                resultStringBuilder.setLength(resultStringBuilder.length() - 2); // Remove trailing comma and space
+                resultStringBuilder.append("\n");
+            }
+        }
+
+        resultTextArea.setText(resultStringBuilder.toString());
+    }
+
+    public boolean ProcessInsertData() {
+        String dropTablePatter = "(insert data)";
+
+        Pattern pattern = Pattern.compile(dropTablePatter);
+        Matcher matcher = pattern.matcher(sqlStatementTextArea.getText().toLowerCase());
+
+        if (!matcher.matches()) {
+            return false;
+        }
+
+        if (crtDatabase == null) {
+            resultTextArea.setText("Please select a database to use first!");
+            return true;
+        }
+
+        String SqlStatement;
+        int n = 100;
+
+        // collection disciplines
+        for (int i = 0; i < n; i++) {
+            SqlStatement = "insert into disciplines (DiscID,DName,CreditNr) values (" +
+                    "DiscID_" + i + "," +
+                    "DName_" + i + "," +
+                    i + ");";
+            ProcessInsertIntoTable(SqlStatement);
+        }
+
+        // collection specialization
+        for (int i = 0; i < n; i++) {
+            SqlStatement = "insert into specialization (SpecID,SpecName,Language) values (" +
+                    "SpecID_" + i + "," +
+                    "SpecName_" + i + "," +
+                     "Language_" + i + ");";
+            ProcessInsertIntoTable(SqlStatement);
+        }
+
+        // collection groups
+        for (int i = 0; i < n; i++) {
+            SqlStatement = "insert into groups (GroupId,SpecID) values (" +
+                    i + "," +
+                    "SpecID_" + i + ");";
+            ProcessInsertIntoTable(SqlStatement);
+        }
+
+        // collection students
+        for (int i = 0; i < n; i++) {
+            SqlStatement = "insert into students (StudID,GroupId,StudName,Email) values (" +
+                    i + "," +
+                    i + "," +
+                    "StudName_" + i + "," +
+                    "Email_" + i + ");";
+            ProcessInsertIntoTable(SqlStatement);
+        }
+
+        // collection marks
+        for (int i = 0; i < n; i++) {
+            SqlStatement = "insert into marks (StudID,DiscID,Mark) values (" +
+                    i + "," +
+                    "DiscID_" + i + "," +
+                    i + ");";
+            ProcessInsertIntoTable(SqlStatement);
+        }
+
+        resultTextArea.setText("Data successfully inserted;");
         return true;
     }
 }
