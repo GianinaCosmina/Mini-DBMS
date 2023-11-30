@@ -695,12 +695,19 @@ public class MainWindow {
                 collection.deleteOne(Filters.eq("values", columnValue));
                 return;
             }
-//            doc = collection.find(Filters.regex("values",
-//                    "/^(" + columnValue + ")$|(\\$" + columnValue + "\\$)|^(" + columnValue + "\\$)|(\\$" + columnValue + ")$/gm")).first();
-//            if (doc != null) {
-//                collection.deleteOne(Filters.eq("values", columnValue));
-//                return;
-//            }
+            doc = collection.find(Filters.regex("values",
+                    ".*" + columnValue + ".*")).first();
+            if (doc != null) {
+                String values = (String) doc.get("values");
+                values = values.replaceAll(columnValue, "");
+                values = values.replaceAll("^\\$", "");
+                values = values.replaceAll("\\$$", "");
+                values = values.replaceAll("\\$\\$$", "\\$$");
+                Bson updates = Updates.combine(Updates.set("values", values));
+                UpdateOptions options = new UpdateOptions().upsert(true);
+                collection.updateOne(doc, updates, options);
+                return;
+            }
         }
     }
 
@@ -709,11 +716,13 @@ public class MainWindow {
             for (ForeignKey foreignKey : table.getForeignKeys()) {
                 if (foreignKey.getRefTable().equalsIgnoreCase(crtTable.getTableName())) {
                     if (foreignKey.getRefAttribute().equalsIgnoreCase(columnName)) {
-                        MongoCollection<Document> collection = database.getCollection(foreignKey.getRefTable());
-                        Document doc = collection.find(eq("_id", columnValue)).first();
-                        if (doc != null) {
-                            resultTextArea.setText("Foreign Key constraint failure.");
-                            return false;
+                        for (Index index : table.getIndexes()) {
+                            MongoCollection<Document> collection = database.getCollection(index.getIndexName());
+                            Document doc = collection.find(eq("_id", columnValue)).first();
+                            if (doc != null) {
+                                resultTextArea.setText("Foreign Key constraint failure.");
+                                return false;
+                            }
                         }
                     }
                 }

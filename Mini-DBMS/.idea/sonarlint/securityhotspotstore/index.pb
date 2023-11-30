@@ -6,3 +6,7 @@
 gradlew,5\b\5bbfa66edb4db3c7c33c5181f43510990d3307f9
 ?
 settings.gradle,0\5\05efc8b1657769a27696d478ded1e95f38737233
+u
+Esrc/main/java/com/example/minidbms/mongodb/MongoClientConnection.java,9\1\91fa9c1d23c53ffc9f6c8453f77e9b1b4649908d
+8
+dbms.xml,7\d\7d33f34698b0501dcbe863e84f826e1142cb716b

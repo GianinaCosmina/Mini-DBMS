@@ -6,7 +6,7 @@
                 <structure>
                     <attribute columnName="discid" type="varchar" length="5"/>
                     <attribute columnName="dname" type="varchar" length="20"/>
-                    <attribute columnName="creditnr" type="int" unique="true"/>
+                    <attribute columnName="creditnr" type="int"/>
                 </structure>
                 <primaryKey>
                     <pkAttribute>
@@ -16,26 +16,19 @@
                 <foreignKeys/>
                 <IndexAttributes>
                     <IndexAttribute>
-                        <columns>creditnr</columns>
-                        <indexName>creditnr_disciplines_index</indexName>
+                        <columns>DiscID</columns>
+                        <columns>DName</columns>
+                        <indexName>idx_lastname</indexName>
                         <tableName>disciplines</tableName>
-                        <unique>true</unique>
+                        <unique>false</unique>
+                    </IndexAttribute>
+                    <IndexAttribute>
+                        <columns>DName</columns>
+                        <indexName>idx_NAME</indexName>
+                        <tableName>disciplines</tableName>
+                        <unique>false</unique>
                     </IndexAttribute>
                 </IndexAttributes>
-            </table>
-            <table tableName="specialization" fileName="specialization.bin">
-                <structure>
-                    <attribute columnName="specid" type="varchar" length="5"/>
-                    <attribute columnName="specname" type="varchar" length="40"/>
-                    <attribute columnName="language" type="varchar" length="20"/>
-                </structure>
-                <primaryKey>
-                    <pkAttribute>
-                        <pkAttribute>specid</pkAttribute>
-                    </pkAttribute>
-                </primaryKey>
-                <foreignKeys/>
-                <IndexAttributes/>
             </table>
         </tables>
     </database>
