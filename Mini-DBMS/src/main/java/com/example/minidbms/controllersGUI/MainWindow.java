@@ -827,35 +827,23 @@ public class MainWindow {
             }
         }
 
-//        MongoCollection<Document> collection = database.getCollection(tableName);
-//
-//        List<Document> resultDocuments;
-//        if (whereClause != null && !whereClause.trim().isEmpty()) {
-//            // Implement logic to parse and execute WHERE conditions
-//            resultDocuments = ExecuteWhereCondition(collection, whereClause);
-//        } else {
-//            resultDocuments = collection.find().into(new ArrayList<>());
-//        }
-//
-//        // Display query results
-//        DisplayQueryResults(resultDocuments, columnAndTableList);
-
         MongoDatabase database = mongoClient.getDatabase(crtDatabase.getDatabaseName());
 
         List<Document> resultDocuments = null;
         List<Document> resultDocumentsList = null;
         if (whereClause != null && !whereClause.trim().isEmpty()) {
 //             Implement logic to parse and execute WHERE conditions // TODO
-//            resultDocuments = ExecuteWhereCondition(collection, whereClause);
+            resultDocumentsList = ExecuteWhereCondition(whereClause, tablesInWhichToSearchList, database);
         } else {
             for (String tableName: tablesInWhichToSearchList) {
                 MongoCollection<Document> collection = database.getCollection(tableName);
                 resultDocuments = collection.find().into(new ArrayList<>());
-            }
-            if (resultDocumentsList == null) {
-                resultDocumentsList = resultDocuments;
-            } else {
-                resultDocumentsList.addAll(resultDocuments);
+
+                if (resultDocumentsList == null) {
+                    resultDocumentsList = resultDocuments;
+                } else {
+                    resultDocumentsList.addAll(resultDocuments);
+                }
             }
         }
 
@@ -865,20 +853,79 @@ public class MainWindow {
         return true;
     }
 
-    private List<Document> ExecuteWhereCondition(MongoCollection<Document> collection, String whereClause) {
+    private List<Document> ExecuteWhereCondition(String whereClause, List<String> tablesInWhichToSearchList, MongoDatabase database) {
         // Implement logic to parse and execute WHERE conditions
         // For simplicity, let's assume a basic condition, e.g., "columnName = 'value'"
         String[] parts = whereClause.split("=");
-        if (parts.length == 2) {
-            String columnName = parts[0].trim();
-            String value = parts[1].trim().replaceAll("'", "");
+        parts = whereClause.split("like");
+        List<Document> resultDocuments = new ArrayList<>();
 
-            return collection.find(Filters.eq(columnName, value)).into(new ArrayList<>());
+        if (parts.length == 2) {
+            String columnNameMaybeTable = parts[0].trim();
+            String value = parts[1].trim().replaceAll("'", "");
+            String columnName;
+            String tableName;
+
+            if (columnNameMaybeTable.contains(".")) {
+                columnName = columnNameMaybeTable.split(".")[0];
+                tableName = columnNameMaybeTable.split(".")[1];
+            } else {
+                columnName = columnNameMaybeTable;
+                tableName = tablesInWhichToSearchList.get(0);
+            }
+
+            Table crtTable = crtDatabase.getTableByName(tableName);
+            List<Document> docs = new ArrayList<>();
+            boolean thereIsIndex = false;
+            for(Index index : crtTable.getIndexes()) {
+                if (index.getColumns().get(0).equalsIgnoreCase(columnName)) {
+                    MongoCollection<Document> collection = database.getCollection(tableName + "_" + columnName + "_index");
+                    docs = collection.find(Filters.eq("_id", value)).into(new ArrayList<>());
+                    thereIsIndex = true;
+                }
+            }
+            Map<String, String> columnValueMap;
+            if (!thereIsIndex) {
+                MongoCollection<Document> collection = database.getCollection(tableName);
+                for (Document document : collection.find()) {
+                    columnValueMap = getColumnValueMap(document, crtTable);
+                    if (columnValueMap.get(columnName) != null) {
+                        if (columnValueMap.get(columnName).equalsIgnoreCase(value)) {
+                            resultDocuments.add(document);
+                        }
+                    }
+                }
+            }
+
+            if (thereIsIndex) {
+                for (Document doc : docs) {
+                    MongoCollection<Document> collection = database.getCollection(tableName);
+                    resultDocuments = collection.find(Filters.eq("_id", doc.get("values"))).into(new ArrayList<>());
+                }
+            }
         }
 
         // Handle more complex conditions as needed
 
-        return new ArrayList<>();
+        return resultDocuments;
+    }
+
+    private Map<String, String> getColumnValueMap(Document document, Table crtTable) {
+        Map<String, String> ColumnValueMap = new HashMap<>();
+        int index = 0;
+        for (PrimaryKey pk : crtTable.getPrimaryKeys()) {
+            ColumnValueMap.put(pk.getPkAttribute(), document.get("_id").toString().split("#")[index]);
+            index++;
+        }
+        index = 0;
+        for (Column col : crtTable.getColumns()) {
+            if (ColumnValueMap.get(col.getColumnName()) == null) {
+                ColumnValueMap.put(col.getColumnName(), document.get("values").toString().split("#")[index]);
+                index++;
+            }
+        }
+
+        return  ColumnValueMap;
     }
 
     private void DisplayQueryResults(List<Document> resultDocuments, List<Pair<String, String>> selectedColumns, boolean isDistinct) {
@@ -886,53 +933,27 @@ public class MainWindow {
         StringBuilder resultStringBuilder = new StringBuilder();
         List<String> result = new ArrayList<>();
 
+        if (resultDocuments == null) {
+            resultTextArea.setText("No records found!");
+            return;
+        }
+
         for (Document document : resultDocuments) {
             // Display selected columns
             resultStringBuilder = new StringBuilder();
             for (Pair<String, String> column : selectedColumns) {
-                List<String> ids = Arrays.stream(document.get("_id").toString().split("#")).toList();
-                List<String> values = Arrays.stream(document.get("values").toString().split("#")).toList();
                 Table crtTable = crtDatabase.getTableByName(column.getValue());
 
+                Map<String, String> columnValueMap = getColumnValueMap(document, crtTable);
                 if (!column.getKey().trim().equals("*")) {
-                    int index = 0;
-                    boolean valueSet = false;
-                    List<String> columnsAlreadyChecked = new ArrayList<>();
-                    for (PrimaryKey pk : crtTable.getPrimaryKeys()) {
-                        columnsAlreadyChecked.add(pk.getPkAttribute());
-                        if (Objects.equals(pk.getPkAttribute(), column.getKey())) {
-                            resultStringBuilder.append(column.getKey()).append(": ").append(ids.get(index)).append("; ");
-                            valueSet = true;
-                            break;
-                        }
-                        index++;
-                    }
-                    index = 0;
-                    if (!valueSet) {
-                        for (Column col : crtTable.getColumns()) {
-                            if (!columnsAlreadyChecked.contains(col.getColumnName())) {
-                                if (Objects.equals(col.getColumnName(), column.getKey())) {
-                                    resultStringBuilder.append(column.getKey()).append(": ").append(values.get(index)).append("; ");
-                                    break;
-                                }
-                                index++;
-                            }
+                    for (Map.Entry<String,String> entry : columnValueMap.entrySet()) {
+                        if (Objects.equals(entry.getKey(), column.getKey())) {
+                            resultStringBuilder.append(entry.getKey()).append(": ").append(entry.getValue()).append("; ");
                         }
                     }
                 } else {
-                    int index = 0;
-                    List<String> columnsAlreadyChecked = new ArrayList<>();
-                    for (PrimaryKey pk : crtTable.getPrimaryKeys()) {
-                        columnsAlreadyChecked.add(pk.getPkAttribute());
-                        resultStringBuilder.append(pk.getPkAttribute()).append(": ").append(ids.get(index)).append("; ");
-                        index++;
-                    }
-                    index = 0;
-                    for (Column col : crtTable.getColumns()) {
-                        if (!columnsAlreadyChecked.contains(col.getColumnName())) {
-                            resultStringBuilder.append(col.getColumnName()).append(": ").append(values.get(index)).append("; ");
-                            index++;
-                        }
+                    for (Map.Entry<String,String> entry : columnValueMap.entrySet()) {
+                        resultStringBuilder.append(entry.getKey()).append(": ").append(entry.getValue()).append("; ");
                     }
                 }
             }
