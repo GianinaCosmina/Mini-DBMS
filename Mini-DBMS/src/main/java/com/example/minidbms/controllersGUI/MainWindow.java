@@ -845,7 +845,7 @@ public class MainWindow {
         List<Document> resultDocuments = null;
         List<Document> resultDocumentsList = null;
         if (whereClause != null && !whereClause.trim().isEmpty()) {
-            // Implement logic to parse and execute WHERE conditions // TODO
+//             Implement logic to parse and execute WHERE conditions // TODO
 //            resultDocuments = ExecuteWhereCondition(collection, whereClause);
         } else {
             for (String tableName: tablesInWhichToSearchList) {
@@ -884,53 +884,71 @@ public class MainWindow {
     private void DisplayQueryResults(List<Document> resultDocuments, List<Pair<String, String>> selectedColumns, boolean isDistinct) {
         // Implement logic to display query results
         StringBuilder resultStringBuilder = new StringBuilder();
+        List<String> result = new ArrayList<>();
 
         for (Document document : resultDocuments) {
-            if (selectedColumns == null) {
-                // Display all columns
-                resultStringBuilder.append(document.toJson()).append("\n");
-            } else {
-                // Display selected columns
-                for (Pair<String, String> column : selectedColumns) {
-                    List<String> ids = Arrays.stream(document.get("_id").toString().split("#")).toList();
-                    List<String> values = Arrays.stream(document.get("values").toString().split("#")).toList();
-                    Table crtTable = crtDatabase.getTableByName(column.getValue());
+            // Display selected columns
+            resultStringBuilder = new StringBuilder();
+            for (Pair<String, String> column : selectedColumns) {
+                List<String> ids = Arrays.stream(document.get("_id").toString().split("#")).toList();
+                List<String> values = Arrays.stream(document.get("values").toString().split("#")).toList();
+                Table crtTable = crtDatabase.getTableByName(column.getValue());
 
-                    if (Objects.equals(column.getKey(), "*")) {
-                        int index = 0;
-                        boolean valueSet = false;
-                        List<String> columnsAlreadyChecked = new ArrayList<>();
-                        for (PrimaryKey pk : crtTable.getPrimaryKeys()) {
-                            columnsAlreadyChecked.add(pk.getPkAttribute());
-                            if (Objects.equals(pk.getPkAttribute(), column.getKey())) {
-                                resultStringBuilder.append(column.getKey()).append(": ").append(ids.get(index)).append(", ");
-                                valueSet = true;
-                                break;
+                if (!column.getKey().trim().equals("*")) {
+                    int index = 0;
+                    boolean valueSet = false;
+                    List<String> columnsAlreadyChecked = new ArrayList<>();
+                    for (PrimaryKey pk : crtTable.getPrimaryKeys()) {
+                        columnsAlreadyChecked.add(pk.getPkAttribute());
+                        if (Objects.equals(pk.getPkAttribute(), column.getKey())) {
+                            resultStringBuilder.append(column.getKey()).append(": ").append(ids.get(index)).append("; ");
+                            valueSet = true;
+                            break;
+                        }
+                        index++;
+                    }
+                    index = 0;
+                    if (!valueSet) {
+                        for (Column col : crtTable.getColumns()) {
+                            if (!columnsAlreadyChecked.contains(col.getColumnName())) {
+                                if (Objects.equals(col.getColumnName(), column.getKey())) {
+                                    resultStringBuilder.append(column.getKey()).append(": ").append(values.get(index)).append("; ");
+                                    break;
+                                }
+                                index++;
                             }
+                        }
+                    }
+                } else {
+                    int index = 0;
+                    List<String> columnsAlreadyChecked = new ArrayList<>();
+                    for (PrimaryKey pk : crtTable.getPrimaryKeys()) {
+                        columnsAlreadyChecked.add(pk.getPkAttribute());
+                        resultStringBuilder.append(pk.getPkAttribute()).append(": ").append(ids.get(index)).append("; ");
+                        index++;
+                    }
+                    index = 0;
+                    for (Column col : crtTable.getColumns()) {
+                        if (!columnsAlreadyChecked.contains(col.getColumnName())) {
+                            resultStringBuilder.append(col.getColumnName()).append(": ").append(values.get(index)).append("; ");
                             index++;
                         }
-                        index = 0;
-                        if (!valueSet) {
-                            for (Column col : crtTable.getColumns()) {
-                                if (!columnsAlreadyChecked.contains(col.getColumnName())) {
-                                    if (Objects.equals(col.getColumnName(), column.getKey())) {
-                                        resultStringBuilder.append(column.getKey()).append(": ").append(values.get(index)).append(", ");
-                                        break;
-                                    }
-                                    index++;
-                                }
-                            }
-                        }
-                    } else {
-                        // TODO
                     }
                 }
-                resultStringBuilder.setLength(resultStringBuilder.length() - 2); // Remove trailing comma and space
-                resultStringBuilder.append("\n");
             }
+            resultStringBuilder.setLength(resultStringBuilder.length() - 2); // Remove trailing comma and space
+            resultStringBuilder.append("\n");
+            result.add(resultStringBuilder.toString());
         }
 
-        resultTextArea.setText(resultStringBuilder.toString());
+        if (isDistinct) {
+            result = result.stream().distinct().toList();
+        }
+
+        resultTextArea.setText(result.toString()
+                .replace("[","")
+                .replace("]", "")
+                .replace(", ", ""));
     }
 
     public boolean ProcessInsertData() {
