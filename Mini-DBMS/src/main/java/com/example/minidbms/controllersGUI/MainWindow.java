@@ -11,6 +11,7 @@ import com.mongodb.client.model.Updates;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.Tab;
 import javafx.scene.control.TextArea;
 import javafx.stage.Stage;
 import javafx.util.Pair;
@@ -1159,6 +1160,21 @@ public class MainWindow {
         String columnName1 = OnCondition.split(condition)[0].trim().split("\\.")[1];
         String columnName2 = OnCondition.split(condition)[1].trim().split("\\.")[1];
 
+        boolean hasIndex1 = false;
+        for (Index index : indexList1) {
+            if (index.getColumns().contains(columnName1)) {
+                hasIndex1 = true;
+                break;
+            }
+        }
+        boolean hasIndex2 = false;
+        for (Index index : indexList2) {
+            if (index.getColumns().contains(columnName2)) {
+                hasIndex2 = true;
+                break;
+            }
+        }
+
         // where clauses
         String whereClause = matcher.group(13);
         if (whereClause != null) {
@@ -1169,17 +1185,16 @@ public class MainWindow {
         MongoDatabase database = mongoClient.getDatabase(crtDatabase.getDatabaseName());
 
         // sort merge join
-        if (indexList1.isEmpty() && indexList2.isEmpty()){
+        if (!hasIndex1 && !hasIndex2) {
             result = sortMergeJoin(table1, table2, columnList1, pkList1, columnList2, pkList2, columnName1, columnName2, database, 0, 1);
-            result = finalJoinOfData(result);
-            result = parseConditionsForJoin(result, condition, table1, table2, columnName1, columnName2);
         // indexed nested loops
-        } else if (!indexList1.isEmpty()) {
+        } else if (hasIndex1) {
             result = indexedNestedLoop(table2, table1, indexList1, columnList2, pkList2, 0, 1, columnName2, columnName1, database);
-        } else if (!indexList2.isEmpty()) {
+        } else if (hasIndex2) {
             result = indexedNestedLoop(table1, table2, indexList2, columnList1, pkList1, 1, 0, columnName1, columnName2, database);
         }
-
+        result = finalJoinOfData(result);
+        result = parseConditionsForJoin(result, condition, table1, table2, columnName1, columnName2);
 
         // Display query results
         // columns to show
@@ -1198,7 +1213,7 @@ public class MainWindow {
             }
         }
 
-        DisplayResults(result, columnAndTableList, table1, table2);
+        DisplayResults(result, columnAndTableList, table1, table2, isDistinct);
 
         return true;
     }
@@ -1321,7 +1336,7 @@ public class MainWindow {
         return false;
     }
 
-    private void DisplayResults(List<List<Document>> resultDocuments, List<Pair<String, String>> selectedColumns, Table table1, Table table2) {
+    private void DisplayResults(List<List<Document>> resultDocuments, List<Pair<String, String>> selectedColumns, Table table1, Table table2, boolean isDistinct) {
         // Implement logic to display query results
         StringBuilder resultStringBuilder = new StringBuilder();
         List<String> result = new ArrayList<>();
@@ -1360,6 +1375,10 @@ public class MainWindow {
             result.add(resultStringBuilder.toString());
         }
 
+        if (isDistinct) {
+            result = result.stream().distinct().toList();
+        }
+
         resultTextArea.setText(result.toString()
                 .replace("[","")
                 .replace("]", "")
@@ -1373,12 +1392,50 @@ public class MainWindow {
 
         MongoCollection<Document> collection1 = database.getCollection(table1.getTableName());
         List<Document> list1 = collection1.find().into(new ArrayList<>());
-        MongoCollection<Document> collection2 = database.getCollection(table2.getTableName());
-        List<Document> list2 = collection2.find().into(new ArrayList<>());
 
-        List<String> l1v = new ArrayList<>();
-        List<String> l2v = new ArrayList<>();
+        for (Document doc : list1) {
+            List<String> resValues = Arrays.stream(doc.getString("values").split("#")).filter(value -> !value.trim().isEmpty()).toList();
+            List<String> resPk = Arrays.stream(doc.getString("_id").split("#")).filter(pkValue -> !pkValue.trim().isEmpty()).toList();
 
+            for (int attributeListIndex = 0; attributeListIndex < columnList.size(); attributeListIndex++) {
+                String att = columnList.get(attributeListIndex);
+                if (att.equals(columnName1)) {
+                    result = indexSearchInTableJoin(result, indexList, table2, i1, columnName2, resValues.get(attributeListIndex), database);
+                    result.get(i2).add(doc);
+
+                    break;
+                }
+            }
+
+            for (int pkIndex = 0; pkIndex < pkList.size(); pkIndex++) {
+                String pk = pkList.get(pkIndex);
+                if (pk.equals(columnName1)) {
+                    result = indexSearchInTableJoin(result, indexList, table2, i1, columnName2, resPk.get(pkIndex), database);
+                    result.get(i2).add(doc);
+
+                    break;
+                }
+            }
+        }
+        return result;
+    }
+
+    public List<List<Document>> indexSearchInTableJoin(List<List<Document>> result, List<Index> indexList, Table table, int i, String columnName, String expectedValue, MongoDatabase database) {
+        List<Document> docs = new ArrayList<>();
+
+        for (Index index : indexList) {
+            if (index.getIndexName().contains(columnName)) {
+                MongoCollection<Document> collection = database.getCollection(table.getTableName().toLowerCase() + "_" + columnName.toLowerCase() + "_index");
+                docs.addAll(collection.find(Filters.eq("_id", expectedValue)).into(new ArrayList<>()));
+                for (Document doc : docs) {
+                    MongoCollection<Document> collection2 = database.getCollection(table.getTableName());
+                    List<String> values = Arrays.stream(doc.get("values").toString().split("\\$")).toList();
+                    for (String value : values) {
+                        result.get(i).addAll(collection2.find(Filters.eq("_id", value)).into(new ArrayList<>()));
+                    }
+                }
+            }
+        }
         return result;
     }
 }

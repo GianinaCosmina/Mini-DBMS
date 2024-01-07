@@ -171,6 +171,20 @@
                     </IndexAttribute>
                 </IndexAttributes>
             </table>
+            <table tableName="orders_2" fileName="orders_2.bin">
+                <structure>
+                    <attribute columnName="orderid" type="int"/>
+                    <attribute columnName="customerid" type="int"/>
+                    <attribute columnName="description" type="varchar" length="20"/>
+                </structure>
+                <primaryKey>
+                    <pkAttribute>
+                        <pkAttribute>orderid</pkAttribute>
+                    </pkAttribute>
+                </primaryKey>
+                <foreignKeys/>
+                <IndexAttributes/>
+            </table>
         </tables>
     </database>
 </databases>
