@@ -85,6 +85,9 @@ public class MainWindow {
         if (ProcessSelectFromTable()) {
             return;
         }
+        if (ProcessInnerJoin()) {
+            return;
+        }
         else {
             resultTextArea.setText("SQL Statement unknown!");
         }
@@ -805,11 +808,11 @@ public class MainWindow {
         if (columnsToShow != null) {
             columnsToShow = columnsToShow.trim();
         }
-        List<String> columnsToShowAux = Arrays.stream(columnsToShow.split(",")).map(s -> s.trim()).toList();
+        List<String> columnsToShowAux = Arrays.stream(columnsToShow.split(",")).map(String::trim).toList();
         List<Pair<String,String>> columnAndTableList = new ArrayList<>();
         for (String column: columnsToShowAux) {
             if (column.contains(".")) {
-                List<String> columnAndTable = List.of(column.split("."));
+                List<String> columnAndTable = List.of(column.split("\\."));
                 columnAndTableList.add(new Pair<>(columnAndTable.get(0), columnAndTable.get(1)));
             } else {
                 columnAndTableList.add(new Pair<>(column.trim(), tablesInWhichToSearchList.get(0)));
@@ -1082,5 +1085,300 @@ public class MainWindow {
 
         resultTextArea.setText("Data successfully inserted;");
         return true;
+    }
+
+    public boolean ProcessInnerJoin() {
+        String selectPattern = "^\\s*(select)(\\s+)(distinct)?(\\s+)?((?:\\w+\\.\\w+|[\\w\\*]+\\s*,\\s*\\w+\\.\\w+|\\s*,\\s*[\\w\\*]+)*)(\\s+)(from)(\\s+)(\\w+\\s*(?:,\\s*\\w+\\s*)*)(\\s*)(?:(where)(\\s+)((.|\\n)*))?(inner join)(\\s+)(\\w+\\s*(?:,\\s*\\w+\\s*)*)(\\s*)(on)(\\s+)((.|\\n)*);";
+
+        Pattern pattern = Pattern.compile(selectPattern, Pattern.CASE_INSENSITIVE);
+        Matcher matcher = pattern.matcher(sqlStatementTextArea.getText().toLowerCase());
+
+        if (!matcher.matches()) {
+            return false;
+        }
+
+        if (crtDatabase == null) {
+            resultTextArea.setText("Please select a database to use first!");
+            return true;
+        }
+
+        // is distinct
+        String isDistinctString = matcher.group(3);
+        boolean isDistinct = false;
+        if (isDistinctString != null) {
+            isDistinct = true;
+        }
+
+        // table1 and table2
+        String table1String = matcher.group(9).trim();
+        String table2String = matcher.group(17).trim();
+
+        Table table1 = crtDatabase.getTableByName(table1String);
+        Table table2 = crtDatabase.getTableByName(table2String);
+
+        if (table1 == null) {
+            resultTextArea.setText("Table " + table1String + " does not exist in the " + crtDatabase.getDatabaseName() + " database.");
+            return true;
+        }
+        if (table2 == null) {
+            resultTextArea.setText("Table " + table2String + " does not exist in the " + crtDatabase.getDatabaseName() + " database.");
+            return true;
+        }
+
+        // indexes + columns + pks
+        List<Index> indexList1 = table1.getIndexes();
+        List<String> columnList1 = table1.getColumnsNotPartOfPK().stream().map(Column::getColumnName).toList();
+        List<String> pkList1 = table1.getPrimaryKeys().stream().map(PrimaryKey::getPkAttribute).toList();
+
+        List<Index> indexList2 = table2.getIndexes();
+        List<String> columnList2 = table2.getColumnsNotPartOfPK().stream().map(Column::getColumnName).toList();;
+        List<String> pkList2 = table2.getPrimaryKeys().stream().map(PrimaryKey::getPkAttribute).toList();;
+
+        // columns
+        String OnCondition = matcher.group(21);
+        String condition = "";
+        if (OnCondition.contains("=")) {
+            condition = "=";
+        }
+        if (OnCondition.contains("like")) {
+            condition = "like";
+        }
+        if (OnCondition.contains("<")) {
+            condition = "<";
+        }
+        if (OnCondition.contains(">")) {
+            condition = ">";
+        }
+        if (OnCondition.contains("<=")) {
+            condition = "<=";
+        }
+        if (OnCondition.contains(">=")) {
+            condition = ">=";
+        }
+
+        String columnName1 = OnCondition.split(condition)[0].trim().split("\\.")[1];
+        String columnName2 = OnCondition.split(condition)[1].trim().split("\\.")[1];
+
+        // where clauses
+        String whereClause = matcher.group(13);
+        if (whereClause != null) {
+            whereClause = whereClause.trim();
+        }
+
+        List<List<Document>> result = null;
+        MongoDatabase database = mongoClient.getDatabase(crtDatabase.getDatabaseName());
+
+        // sort merge join
+        if (indexList1.isEmpty() && indexList2.isEmpty()){
+            result = sortMergeJoin(table1, table2, columnList1, pkList1, columnList2, pkList2, columnName1, columnName2, database, 0, 1);
+            result = finalJoinOfData(result);
+            result = parseConditionsForJoin(result, condition, table1, table2, columnName1, columnName2);
+        // indexed nested loops
+        } else if (!indexList1.isEmpty()) {
+            result = indexedNestedLoop(table2, table1, indexList1, columnList2, pkList2, 0, 1, columnName2, columnName1, database);
+        } else if (!indexList2.isEmpty()) {
+            result = indexedNestedLoop(table1, table2, indexList2, columnList1, pkList1, 1, 0, columnName1, columnName2, database);
+        }
+
+
+        // Display query results
+        // columns to show
+        String columnsToShow = matcher.group(5);
+        if (columnsToShow != null) {
+            columnsToShow = columnsToShow.trim();
+        }
+        List<String> columnsToShowAux = Arrays.stream(columnsToShow.split(",")).map(s -> s.trim()).toList();
+        List<Pair<String,String>> columnAndTableList = new ArrayList<>();
+        for (String column: columnsToShowAux) {
+            if (column.contains(".")) {
+                List<String> columnAndTable = List.of(column.split("\\."));
+                columnAndTableList.add(new Pair<>(columnAndTable.get(1), columnAndTable.get(0)));
+            } else {
+                columnAndTableList.add(new Pair<>(column.trim(), table1String));
+            }
+        }
+
+        DisplayResults(result, columnAndTableList, table1, table2);
+
+        return true;
+    }
+
+    public List<List<Document>> sortMergeJoin(Table table1, Table table2, List<String> columnList1, List<String> pkList1, List<String> columnList2, List<String> pkList2, String columnName1, String columnName2, MongoDatabase database, int i1, int i2) {
+        List<List<Document>> result = new ArrayList<>();
+        result.add(new ArrayList<>());
+        result.add(new ArrayList<>());
+
+        MongoCollection<Document> collection1 = database.getCollection(table1.getTableName());
+        List<Document> list1 = collection1.find().into(new ArrayList<>());
+        MongoCollection<Document> collection2 = database.getCollection(table2.getTableName());
+        List<Document> list2 = collection2.find().into(new ArrayList<>());
+
+        List<String> l1v = new ArrayList<>();
+        List<String> l2v = new ArrayList<>();
+
+        if (columnList1.contains(columnName1)) {
+            list1.sort(Comparator.comparing(item -> item.get("values").toString().split("#")[columnList1.indexOf(columnName1)]));
+            l1v = list1.stream().map(item -> item.get("values").toString().split("#")[columnList1.indexOf(columnName1)]).toList();
+        } else if (pkList1.contains(columnName1)) {
+            list1.sort(Comparator.comparing(item -> item.get("_id").toString().split("#")[pkList1.indexOf(columnName1)]));
+            l1v = list1.stream().map(item -> item.get("_id").toString().split("#")[pkList1.indexOf(columnName1)]).toList();
+        }
+        if (columnList2.contains(columnName2)) {
+            list2.sort(Comparator.comparing(item -> item.get("values").toString().split("#")[columnList2.indexOf(columnName2)]));
+            l2v = list2.stream().map(item -> item.get("values").toString().split("#")[columnList2.indexOf(columnName2)]).toList();
+        } else if (pkList2.contains(columnName2)) {
+            list2.sort(Comparator.comparing(item -> item.get("_id").toString().split("#")[pkList2.indexOf(columnName2)]));
+            l2v = list2.stream().map(item -> item.get("_id").toString().split("#")[pkList2.indexOf(columnName2)]).toList();
+        }
+
+        int j1 = 0, j2 = 0;
+        while (j1 < list1.size() && j2 < list2.size()) {
+            while (l1v.get(j1).equals(l2v.get(j2))) {
+                result.get(i2).add(list2.get(j2));
+                result.get(i1).add(list1.get(j1));
+
+                j1++;
+                j2++;
+
+                if (j1 == list1.size() || j2 == list2.size()) {
+                    break;
+                }
+            }
+            if (j1 < list1.size() && j2 < list2.size()) {
+                while (l1v.get(j1).compareTo(l2v.get(j2)) < 0) {
+                    result.get(i1).add(list1.get(j1));
+                    j1++;
+                    if (j1 == list1.size()) {
+                        break;
+                    }
+                }
+            }
+            if (j1 < list1.size() && j2 < list2.size()) {
+                while (l1v.get(j1).compareTo(l2v.get(j2)) > 0) {
+                    result.get(i2).add(list2.get(j2));
+                    j2++;
+                    if (j2 == list2.size()) {
+                        break;
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    private List<List<Document>> finalJoinOfData(List<List<Document>> result) {
+        List<List<Document>> interm = null;
+        List<Document> aux = new ArrayList<>(result.get(0));
+
+        for (int i = 1; i < result.size(); i++) {
+            interm = cartesianProduct(aux, result.get(i));
+        }
+
+        return interm;
+    }
+
+    private static List<List<Document>> cartesianProduct(List<Document> list1, List<Document> list2) {
+        List<List<Document>> result = new ArrayList<>();
+
+        for (Document item : list1) {
+            for (Document element : list2) {
+                List<Document> newItem = new ArrayList<>();
+                newItem.add(item);
+                newItem.add(element);
+                result.add(newItem);
+            }
+        }
+
+        return result;
+    }
+
+    public List<List<Document>> parseConditionsForJoin(List<List<Document>> before, String condition, Table table1, Table table2, String columnName1, String columnName2) {
+        List<List<Document>> result = new ArrayList<>();
+
+        for (List<Document> item : before) {
+            if (checkCond(condition, item, table1, table2, columnName1, columnName2)) {
+                result.add(item);
+            }
+        }
+
+        return result;
+    }
+
+    public boolean checkCond(String condition, List<Document> documents, Table table1, Table table2, String columnName1, String columnName2) {
+        Map<String, String> columnValueMap1 = getColumnValueMap(documents.get(0), table1);
+        Map<String, String> columnValueMap2 = getColumnValueMap(documents.get(1), table2);
+
+        switch (condition) {
+            case "=" : {
+                if(Objects.equals(columnValueMap1.get(columnName1), columnValueMap2.get(columnName2))) {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private void DisplayResults(List<List<Document>> resultDocuments, List<Pair<String, String>> selectedColumns, Table table1, Table table2) {
+        // Implement logic to display query results
+        StringBuilder resultStringBuilder = new StringBuilder();
+        List<String> result = new ArrayList<>();
+
+        if (resultDocuments == null) {
+            resultTextArea.setText("No records found!");
+            return;
+        }
+
+        for (List<Document> documents : resultDocuments) {
+            // Display selected columns
+            resultStringBuilder = new StringBuilder();
+            for (Pair<String, String> column : selectedColumns) {
+                Table crtTable = crtDatabase.getTableByName(column.getValue());
+
+                Map<String, String> columnValueMap;
+                if (Objects.equals(crtTable.getTableName(), table1.getTableName())) {
+                    columnValueMap = getColumnValueMap(documents.get(0), crtTable);
+                } else {
+                    columnValueMap = getColumnValueMap(documents.get(1), crtTable);
+                }
+                if (!column.getKey().trim().equals("*")) {
+                    for (Map.Entry<String,String> entry : columnValueMap.entrySet()) {
+                        if (Objects.equals(entry.getKey(), column.getKey())) {
+                            resultStringBuilder.append(entry.getKey()).append(": ").append(entry.getValue()).append("; ");
+                        }
+                    }
+                } else {
+                    for (Map.Entry<String,String> entry : columnValueMap.entrySet()) {
+                        resultStringBuilder.append(entry.getKey()).append(": ").append(entry.getValue()).append("; ");
+                    }
+                }
+            }
+            resultStringBuilder.setLength(resultStringBuilder.length() - 2); // Remove trailing comma and space
+            resultStringBuilder.append("\n");
+            result.add(resultStringBuilder.toString());
+        }
+
+        resultTextArea.setText(result.toString()
+                .replace("[","")
+                .replace("]", "")
+                .replace(", ", ""));
+    }
+
+    public List<List<Document>> indexedNestedLoop(Table table1, Table table2, List<Index> indexList, List<String> columnList, List<String> pkList, int i1, int i2, String columnName1, String columnName2, MongoDatabase database) {
+        List<List<Document>> result = new ArrayList<>();
+        result.add(new ArrayList<>());
+        result.add(new ArrayList<>());
+
+        MongoCollection<Document> collection1 = database.getCollection(table1.getTableName());
+        List<Document> list1 = collection1.find().into(new ArrayList<>());
+        MongoCollection<Document> collection2 = database.getCollection(table2.getTableName());
+        List<Document> list2 = collection2.find().into(new ArrayList<>());
+
+        List<String> l1v = new ArrayList<>();
+        List<String> l2v = new ArrayList<>();
+
+        return result;
     }
 }

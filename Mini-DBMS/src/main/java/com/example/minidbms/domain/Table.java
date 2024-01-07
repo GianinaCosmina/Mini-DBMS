@@ -93,6 +93,17 @@ class Table {
         return columns;
     }
 
+    public List<Column> getColumnsNotPartOfPK() {
+        List<Column> cols = new ArrayList<>();
+        List<String> pkNames = primaryKeys.stream().map(PrimaryKey::getPkAttribute).toList();
+        for (Column col: columns) {
+            if(!pkNames.contains(col.getColumnName())) {
+                cols.add(col);
+            }
+        }
+        return cols;
+    }
+
     public void setColumns(List<Column> columns) {
         this.columns = columns;
     }

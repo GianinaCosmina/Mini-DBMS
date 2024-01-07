@@ -127,4 +127,50 @@
             </table>
         </tables>
     </database>
+    <database databaseName="lab5">
+        <tables>
+            <table tableName="customers" fileName="customers.bin">
+                <structure>
+                    <attribute columnName="customerid" type="int"/>
+                    <attribute columnName="customername" type="varchar" length="20"/>
+                    <attribute columnName="contactname" type="varchar" length="20"/>
+                    <attribute columnName="country" type="varchar" length="20"/>
+                </structure>
+                <primaryKey>
+                    <pkAttribute>
+                        <pkAttribute>customerid</pkAttribute>
+                    </pkAttribute>
+                </primaryKey>
+                <foreignKeys/>
+                <IndexAttributes/>
+            </table>
+            <table tableName="orders" fileName="orders.bin">
+                <structure>
+                    <attribute columnName="orderid" type="int"/>
+                    <attribute columnName="customerid" type="int"/>
+                    <attribute columnName="description" type="varchar" length="20"/>
+                </structure>
+                <primaryKey>
+                    <pkAttribute>
+                        <pkAttribute>orderid</pkAttribute>
+                    </pkAttribute>
+                </primaryKey>
+                <foreignKeys>
+                    <foreignKey>
+                        <fkAttribute>customerid</fkAttribute>
+                        <refAttribute>customerid</refAttribute>
+                        <refTable>customers</refTable>
+                    </foreignKey>
+                </foreignKeys>
+                <IndexAttributes>
+                    <IndexAttribute>
+                        <columns>customerid</columns>
+                        <indexName>orders_customerid_index</indexName>
+                        <tableName>orders</tableName>
+                        <unique>false</unique>
+                    </IndexAttribute>
+                </IndexAttributes>
+            </table>
+        </tables>
+    </database>
 </databases>
